@@ -13,13 +13,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { STATUS_LABELS } from "@repo/core";
-import {
-  updateIssueStatus,
-  USERS,
-  getCurrentUserId,
-  db,
-} from "../../services/mockData";
-import { useLiveQuery } from "dexie-react-hooks";
+import { updateIssueStatus, USERS, getCurrentUserId } from "@repo/storage";
 
 interface Props {
   project: Project;

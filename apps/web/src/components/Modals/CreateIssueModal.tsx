@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { PRIORITY_LABELS, TYPE_LABELS } from "@repo/core";
-import { getProjects, createIssue, USERS } from "../../services/mockData";
+import { getProjects, createIssue, USERS } from "@repo/storage";
 import { IssuePriority, IssueType, IssueStatus } from "../../types";
 import { useLiveQuery } from "dexie-react-hooks";
 

@@ -9,7 +9,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { updateIssue } from "../../services/mockData";
+import { updateIssue } from "@repo/storage";
 
 interface Props {
   issues: Issue[];

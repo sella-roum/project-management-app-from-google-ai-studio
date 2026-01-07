@@ -4,7 +4,7 @@ import {
   loginAsUser,
   registerUser,
   checkIfDatabaseIsSeeded,
-} from "../services/mockData";
+} from "@repo/storage";
 
 export const Login = () => {
   const [email, setEmail] = useState("");

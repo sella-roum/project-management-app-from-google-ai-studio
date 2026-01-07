@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
-import { getProjectById, getIssues, getSprints } from "../services/mockData";
+import { getProjectById, getIssues, getSprints } from "@repo/storage";
 import { ProjectSummary } from "../components/Project/ProjectSummary";
 import { ProjectBoard } from "../components/Project/ProjectBoard";
 import { ProjectBacklog } from "../components/Project/ProjectBacklog";

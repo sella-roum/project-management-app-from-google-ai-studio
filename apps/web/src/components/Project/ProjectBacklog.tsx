@@ -20,7 +20,7 @@ import {
   updateSprintStatus,
   updateIssue,
   createIssue,
-} from "../../services/mockData";
+} from "@repo/storage";
 
 interface Props {
   project: Project;

@@ -12,12 +12,12 @@ import {
 } from "lucide-react";
 import { PRIORITY_LABELS, TYPE_LABELS, executeJQL } from "@repo/core";
 import {
-  db,
   getCurrentUserId,
+  getIssues,
   getProjects,
   getSavedFilters,
   saveFilter,
-} from "../services/mockData";
+} from "@repo/storage";
 import { IssueCard } from "../components/Common/IssueCard";
 import { Issue } from "../types";
 import { useLocation } from "react-router-dom";
@@ -96,7 +96,7 @@ export const Search = ({
 
   const filteredIssues =
     useLiveQuery(async () => {
-      const baseIssues = await db.issues.toArray();
+      const baseIssues = await getIssues();
       let results = [...baseIssues];
       const currentUserId = getCurrentUserId();
 

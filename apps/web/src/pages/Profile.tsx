@@ -5,7 +5,7 @@ import {
   updateUser,
   getUserStats,
   getCurrentUserId,
-} from "../services/mockData";
+} from "@repo/storage";
 import { resetApp } from "../services/appReset";
 import { useConfirm } from "../providers/ConfirmProvider";
 import {

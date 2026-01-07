@@ -6,7 +6,7 @@ import {
   getCurrentUserId,
   updateIssueStatus,
   getRecentIssues,
-} from "../services/mockData";
+} from "@repo/storage";
 import { IssueCard } from "../components/Common/IssueCard";
 import { IssueSkeleton } from "../components/Common/Skeleton";
 import { useNavigate } from "react-router-dom";

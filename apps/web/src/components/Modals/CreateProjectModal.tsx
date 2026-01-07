@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { CATEGORY_LABELS } from "@repo/core";
-import { createProject } from "../../services/mockData";
+import { createProject } from "@repo/storage";
 import { Project } from "../../types";
 
 interface Props {

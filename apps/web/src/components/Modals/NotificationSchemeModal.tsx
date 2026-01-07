@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { DEFAULT_NOTIFICATION_SCHEME } from "../../services/mockData";
+import { DEFAULT_NOTIFICATION_SCHEME } from "@repo/core";
 
 interface Props {
   isOpen: boolean;

@@ -5,7 +5,7 @@ import {
   STATUS_LABELS,
   WORKFLOW_TRANSITIONS,
 } from "@repo/core";
-import { updateProject, deleteProject } from "../../services/mockData";
+import { updateProject, deleteProject } from "@repo/storage";
 import { Save, Shield, Workflow, Bell, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { WorkflowEditorModal } from "../Modals/WorkflowEditorModal";
