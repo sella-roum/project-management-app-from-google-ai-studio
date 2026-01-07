@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Home, Search, FolderKanban, Bell, User } from 'lucide-react';
+import { Home, Search, FolderKanban, Bell, LayoutDashboard } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const NavItem = ({ icon: Icon, label, path, active }: { icon: any, label: string, path: string, active: boolean }) => {
@@ -23,10 +24,10 @@ export const BottomNav = () => {
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-safe md:hidden">
       <div className="flex justify-around items-center h-16">
         <NavItem icon={Home} label="ホーム" path="/" active={currentPath === '/'} />
+        <NavItem icon={LayoutDashboard} label="統計" path="/dashboards" active={currentPath === '/dashboards'} />
         <NavItem icon={FolderKanban} label="プロジェクト" path="/projects" active={currentPath.startsWith('/projects')} />
         <NavItem icon={Search} label="検索" path="/search" active={currentPath === '/search'} />
         <NavItem icon={Bell} label="通知" path="/notifications" active={currentPath === '/notifications'} />
-        <NavItem icon={User} label="マイページ" path="/profile" active={currentPath === '/profile'} />
       </div>
     </div>
   );

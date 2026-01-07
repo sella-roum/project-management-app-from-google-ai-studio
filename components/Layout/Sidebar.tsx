@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Home, Search, FolderKanban, Bell, User } from 'lucide-react';
+import { Home, Search, FolderKanban, Bell, User, LayoutDashboard } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const SidebarItem = ({ icon: Icon, label, path, active }: { icon: any, label: string, path: string, active: boolean }) => {
@@ -23,6 +24,7 @@ export const Sidebar = () => {
     <div className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 h-full pt-4 shrink-0">
       <div className="space-y-1">
         <SidebarItem icon={Home} label="ホーム" path="/" active={currentPath === '/'} />
+        <SidebarItem icon={LayoutDashboard} label="ダッシュボード" path="/dashboards" active={currentPath === '/dashboards'} />
         <SidebarItem icon={FolderKanban} label="プロジェクト" path="/projects" active={currentPath.startsWith('/projects')} />
         <SidebarItem icon={Search} label="検索" path="/search" active={currentPath === '/search'} />
         <SidebarItem icon={Bell} label="通知" path="/notifications" active={currentPath === '/notifications'} />

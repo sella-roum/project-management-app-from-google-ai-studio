@@ -3,15 +3,12 @@ import { getProjects, CATEGORY_LABELS } from '../services/mockData';
 import { useNavigate } from 'react-router-dom';
 import { Star, MoreHorizontal } from 'lucide-react';
 import { CreateProjectModal } from '../components/Modals/CreateProjectModal';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 export const Projects = () => {
-  const [projects, setProjects] = useState(getProjects());
+  const projects = useLiveQuery(() => getProjects()) || [];
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
-
-  const handleProjectCreated = () => {
-    setProjects(getProjects()); // Refresh list
-  };
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
@@ -65,7 +62,7 @@ export const Projects = () => {
       <CreateProjectModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onCreated={handleProjectCreated} 
+        onCreated={() => {}} 
       />
     </div>
   );

@@ -3,23 +3,23 @@ import { getNotifications, markAllNotificationsRead, getIssueById } from '../ser
 import { Bell, MessageSquare, UserPlus } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import { Issue } from '../types';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 interface GlobalContext {
   onOpenIssue: (i: Issue) => void;
 }
 
 export const Notifications = () => {
-  const [notifications, setNotifications] = useState(getNotifications());
+  const notifications = useLiveQuery(() => getNotifications()) || [];
   const { onOpenIssue } = useOutletContext<GlobalContext>();
 
-  const handleMarkAllRead = () => {
-    const updated = markAllNotificationsRead();
-    setNotifications([...updated]); // Trigger re-render
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsRead();
   };
 
-  const handleNotificationClick = (notif: any) => {
+  const handleNotificationClick = async (notif: any) => {
     if (notif.issueId) {
-      const issue = getIssueById(notif.issueId);
+      const issue = await getIssueById(notif.issueId);
       if (issue) {
         onOpenIssue(issue);
       }

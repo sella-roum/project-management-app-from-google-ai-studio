@@ -15,29 +15,37 @@ export const CreateProjectModal: React.FC<Props> = ({ isOpen, onClose, onCreated
   const [type, setType] = useState<'Scrum' | 'Kanban'>('Kanban');
   const [category, setCategory] = useState<'Software' | 'Business'>('Software');
   const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !key) return;
+    if (!name || !key || isSubmitting) return;
 
-    const newProject = createProject({
-      name,
-      key: key.toUpperCase(),
-      type,
-      category,
-      description,
-      iconUrl: type === 'Scrum' ? '🚀' : '📋'
-    });
+    setIsSubmitting(true);
+    try {
+      const newProject = await createProject({
+        name,
+        key: key.toUpperCase(),
+        type,
+        category,
+        description,
+        iconUrl: type === 'Scrum' ? '🚀' : '📋'
+      });
 
-    onCreated(newProject);
-    
-    // Reset
-    setName('');
-    setKey('');
-    setDescription('');
-    onClose();
+      onCreated(newProject);
+      
+      // Reset
+      setName('');
+      setKey('');
+      setDescription('');
+      onClose();
+    } catch (error) {
+      console.error("Failed to create project", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -86,7 +94,7 @@ export const CreateProjectModal: React.FC<Props> = ({ isOpen, onClose, onCreated
               <select 
                 value={type}
                 onChange={(e) => setType(e.target.value as any)}
-                className="w-full p-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
+                className="w-full p-2 bg-white border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
               >
                 <option value="Kanban">カンバン</option>
                 <option value="Scrum">スクラム</option>
@@ -97,7 +105,7 @@ export const CreateProjectModal: React.FC<Props> = ({ isOpen, onClose, onCreated
               <select 
                 value={category}
                 onChange={(e) => setCategory(e.target.value as any)}
-                className="w-full p-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
+                className="w-full p-2 bg-white border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
               >
                 {Object.entries(CATEGORY_LABELS).map(([k, l]) => (
                   <option key={k} value={k}>{l}</option>
@@ -122,10 +130,10 @@ export const CreateProjectModal: React.FC<Props> = ({ isOpen, onClose, onCreated
             </button>
             <button 
               type="submit" 
-              disabled={!name || !key}
+              disabled={!name || !key || isSubmitting}
               className="px-4 py-2 bg-primary text-white font-medium rounded hover:bg-primaryHover disabled:opacity-50"
             >
-              作成
+              {isSubmitting ? '作成中...' : '作成'}
             </button>
           </div>
         </form>

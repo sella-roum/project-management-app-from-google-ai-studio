@@ -1,6 +1,7 @@
-import { Issue, Project, User, Sprint, Notification, IssueStatus, IssuePriority, IssueType, Version } from '../types';
 
-// --- Translation Maps ---
+import { Dexie, Table } from 'dexie';
+import { Issue, Project, User, Sprint, Notification, IssueStatus, IssuePriority, IssueType, Version, AutomationRule, SavedFilter, ViewHistory, WorkLog, AutomationLog, Attachment, LinkType } from '../types';
+
 export const STATUS_LABELS: Record<IssueStatus, string> = {
   'To Do': '未着手',
   'In Progress': '進行中',
@@ -28,230 +29,650 @@ export const CATEGORY_LABELS: Record<string, string> = {
   'Business': 'ビジネス'
 };
 
-// --- Users ---
-export const USERS: User[] = [
-  { id: 'u1', name: 'Alice Engineer', avatarUrl: 'https://picsum.photos/seed/u1/200' },
-  { id: 'u2', name: 'Bob Manager', avatarUrl: 'https://picsum.photos/seed/u2/200' },
-  { id: 'u3', name: 'Charlie Designer', avatarUrl: 'https://picsum.photos/seed/u3/200' },
-  { id: 'u4', name: 'Dave QA', avatarUrl: 'https://picsum.photos/seed/u4/200' },
-];
+export const WORKFLOW_TRANSITIONS: Record<string, string[]> = {
+  'To Do': ['In Progress', 'Done'],
+  'In Progress': ['To Do', 'In Review', 'Done'],
+  'In Review': ['In Progress', 'Done'],
+  'Done': ['In Progress', 'To Do']
+};
 
-export const CURRENT_USER_ID = 'u1';
+export const getCurrentUserId = () => localStorage.getItem('currentUserId') || 'u1';
 
-// --- Projects ---
-export let PROJECTS: Project[] = [
-  {
-    id: 'p1',
-    key: 'WEB',
-    name: 'Webプラットフォーム刷新',
-    description: 'レガシーなWebアプリケーションスタックのモダナイゼーション。',
-    leadId: 'u2',
-    category: 'Software',
-    type: 'Scrum',
-    iconUrl: '🚀'
-  },
-  {
-    id: 'p2',
-    key: 'MOB',
-    name: 'モバイルアプリ V2',
-    description: '次世代のモバイル体験を提供するための開発。',
-    leadId: 'u1',
-    category: 'Software',
-    type: 'Kanban',
-    iconUrl: '📱'
-  },
-  {
-    id: 'p3',
-    key: 'MKT',
-    name: 'Q3 マーケティングキャンペーン',
-    description: '第3四半期に向けたグローバルな展開計画。',
-    leadId: 'u3',
-    category: 'Business',
-    type: 'Kanban',
-    iconUrl: '📈'
+class JiraCloneDB extends Dexie {
+  users!: Table<User>;
+  projects!: Table<Project>;
+  issues!: Table<Issue>;
+  sprints!: Table<Sprint>;
+  projectVersions!: Table<Version>;
+  notifications!: Table<Notification>;
+  automationRules!: Table<AutomationRule>;
+  automationLogs!: Table<AutomationLog>;
+  savedFilters!: Table<SavedFilter>;
+  viewHistory!: Table<ViewHistory>;
+
+  constructor() {
+    super('JiraCloneDB');
+    this.version(8).stores({
+      users: 'id, &email',
+      projects: 'id, key, type, leadId',
+      issues: 'id, key, projectId, sprintId, assigneeId, reporterId, parentId, status, type',
+      sprints: 'id, projectId, status',
+      projectVersions: 'id, projectId',
+      notifications: 'id, read, createdAt',
+      automationRules: 'id, projectId, trigger, enabled',
+      automationLogs: 'id, ruleId, executedAt',
+      savedFilters: 'id',
+      viewHistory: 'id, userId, viewedAt, [userId+issueId]'
+    });
   }
+}
+
+export const db = new JiraCloneDB();
+
+const SEED_USERS: (User & { email?: string })[] = [
+  { id: 'u1', name: 'Alice Engineer', email: 'alice@example.com', avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' },
+  { id: 'u2', name: 'Bob Manager', email: 'bob@example.com', avatarUrl: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=150' },
+  { id: 'u3', name: 'Charlie Designer', email: 'charlie@example.com', avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' },
 ];
 
-// --- Sprints ---
-export let SPRINTS: Sprint[] = [
-  { id: 's1', projectId: 'p1', name: 'WEB スプリント 23', status: 'active', startDate: '2023-10-01', endDate: '2023-10-14', goal: '重大なバグの修正' },
-  { id: 's2', projectId: 'p1', name: 'WEB スプリント 24', status: 'future', goal: '機能開発' },
-  { id: 's3', projectId: 'p1', name: 'WEB バックログ', status: 'future' }, // Virtual sprint container
-];
+export const USERS = SEED_USERS;
 
-// --- Versions (Releases) ---
-export const VERSIONS: Version[] = [
-  { id: 'v1', projectId: 'p1', name: 'v1.0.0', status: 'released', releaseDate: '2023-09-01' },
-  { id: 'v2', projectId: 'p1', name: 'v1.1.0', status: 'unreleased', releaseDate: '2023-10-31', description: 'パフォーマンス改善リリース' },
-  { id: 'v3', projectId: 'p2', name: 'v2.0 Beta', status: 'unreleased', releaseDate: '2023-11-15' },
-];
+export const seedDatabase = async () => {
+  await db.transaction('rw', [db.users, db.projects, db.issues, db.sprints, db.notifications, db.automationRules, db.automationLogs, db.savedFilters, db.viewHistory, db.projectVersions], async () => {
+    await db.users.clear();
+    await db.projects.clear();
+    await db.issues.clear();
+    await db.sprints.clear();
+    await db.notifications.clear();
+    await db.automationRules.clear();
+    await db.automationLogs.clear();
+    await db.savedFilters.clear();
+    await db.viewHistory.clear();
+    await db.projectVersions.clear();
 
-// --- Issues ---
-let issues: Issue[] = [
-  {
-    id: 'i1', key: 'WEB-101', projectId: 'p1', title: '新しいログインフローの実装', type: 'Story', status: 'In Progress', priority: 'High',
-    assigneeId: 'u1', reporterId: 'u2', sprintId: 's1', fixVersionId: 'v2', storyPoints: 5, labels: ['auth', 'frontend'],
-    description: 'SSOをサポートするためにログイン画面を更新する必要があります。',
-    comments: [], createdAt: '2023-10-01', updatedAt: '2023-10-02'
-  },
-  {
-    id: 'i2', key: 'WEB-102', projectId: 'p1', title: 'モーダルのCSS z-index問題を修正', type: 'Bug', status: 'To Do', priority: 'Medium',
-    assigneeId: 'u3', reporterId: 'u4', sprintId: 's1', fixVersionId: 'v2', storyPoints: 2, labels: ['css', 'ui'],
-    description: 'モバイルでモーダルがナビゲーションバーを覆ってしまっています。',
-    comments: [], createdAt: '2023-10-03', updatedAt: '2023-10-03', dueDate: '2023-10-20'
-  },
-  {
-    id: 'i3', key: 'WEB-103', projectId: 'p1', title: 'ユーザープロファイル用バックエンドAPI', type: 'Task', status: 'Done', priority: 'High',
-    assigneeId: 'u1', reporterId: 'u2', sprintId: 's1', fixVersionId: 'v1', storyPoints: 8, labels: ['api', 'backend'],
-    comments: [], createdAt: '2023-09-28', updatedAt: '2023-10-01'
-  },
-  {
-    id: 'i4', key: 'WEB-104', projectId: 'p1', title: 'デザインシステムの更新', type: 'Story', status: 'To Do', priority: 'Low',
-    assigneeId: 'u3', reporterId: 'u2', sprintId: 's2', storyPoints: 3, labels: ['design'],
-    comments: [], createdAt: '2023-10-05', updatedAt: '2023-10-05', dueDate: '2023-10-25'
-  },
-  {
-    id: 'i5', key: 'MOB-55', projectId: 'p2', title: 'iOS 17での起動時クラッシュ', type: 'Bug', status: 'In Review', priority: 'Highest',
-    assigneeId: 'u1', reporterId: 'u4', fixVersionId: 'v3', storyPoints: 0, labels: ['ios', 'crash'],
-    comments: [], createdAt: '2023-10-06', updatedAt: '2023-10-07'
-  },
-  {
-    id: 'i6', key: 'MOB-56', projectId: 'p2', title: 'ダークモード対応の追加', type: 'Story', status: 'To Do', priority: 'Medium',
-    assigneeId: undefined, reporterId: 'u3', fixVersionId: 'v3', storyPoints: 5, labels: ['ui'],
-    comments: [], createdAt: '2023-10-06', updatedAt: '2023-10-06'
-  },
-  {
-    id: 'i7', key: 'WEB-105', projectId: 'p1', title: '新しいグラフライブラリの調査', type: 'Task', status: 'To Do', priority: 'Low',
-    assigneeId: 'u1', reporterId: 'u1', sprintId: 's3', storyPoints: 2, labels: [],
-    comments: [], createdAt: '2023-10-08', updatedAt: '2023-10-08', dueDate: '2023-10-15'
-  }
-];
+    await db.users.bulkAdd(SEED_USERS);
 
-// --- Notifications ---
-let notifications: Notification[] = [
-  { id: 'n1', title: 'BobがあなたをWEB-101に割り当てました', description: '新しいログインフローの実装', read: false, createdAt: '2023-10-01T10:00:00', type: 'assignment', issueId: 'i1' },
-  { id: 'n2', title: 'DaveがMOB-55にコメントしました', description: '"iPhone 13で再現できました"', read: true, createdAt: '2023-10-07T14:30:00', type: 'mention', issueId: 'i5' },
-];
+    const projectId = 'p-demo';
+    await db.projects.add({
+      id: projectId,
+      key: 'DEMO',
+      name: 'Jira Mobile Clone Dev',
+      description: 'このアプリ自体の開発プロジェクトを模したデモデータです。',
+      leadId: 'u1',
+      category: 'Software',
+      type: 'Scrum',
+      iconUrl: '🚀'
+    });
 
-// --- Service Functions ---
+    const sprint1 = 's-1';
+    await db.sprints.add({ id: sprint1, name: 'Sprint 1', projectId, status: 'active' });
+    await db.sprints.add({ id: 's-backlog', name: 'バックログ', projectId, status: 'future' });
 
-export const getProjects = () => PROJECTS;
-export const getProjectById = (id: string) => PROJECTS.find(p => p.id === id);
+    const now = new Date().toISOString();
+    const yesterday = new Date(Date.now() - 86400000).toISOString();
 
-export const updateProject = (id: string, updates: Partial<Project>) => {
-  PROJECTS = PROJECTS.map(p => p.id === id ? { ...p, ...updates } : p);
-  return PROJECTS.find(p => p.id === id);
+    const issues: Issue[] = [
+      {
+        id: 'i-1', key: 'DEMO-1', projectId, title: 'ログイン画面の実装', type: 'Story', status: 'Done', priority: 'High',
+        assigneeId: 'u1', reporterId: 'u2', sprintId: sprint1, labels: ['frontend'], 
+        createdAt: yesterday, updatedAt: now, storyPoints: 5, watcherIds: ['u1'], comments: [], workLogs: [], history: [], links: [], attachments: []
+      },
+      {
+        id: 'i-2', key: 'DEMO-2', projectId, title: 'APIのCORSエラー修正', type: 'Bug', status: 'In Progress', priority: 'Highest',
+        assigneeId: 'u1', reporterId: 'u1', sprintId: sprint1, labels: ['backend', 'bug'], 
+        createdAt: now, updatedAt: now, storyPoints: 3, watcherIds: ['u1', 'u2'], comments: [], workLogs: [], history: [], links: [], attachments: []
+      },
+      {
+        id: 'i-3', key: 'DEMO-3', projectId, title: 'ダッシュボードのデザイン', type: 'Task', status: 'To Do', priority: 'Medium',
+        assigneeId: 'u3', reporterId: 'u1', sprintId: sprint1, labels: ['design'], 
+        createdAt: now, updatedAt: now, storyPoints: 2, watcherIds: [], comments: [], workLogs: [], history: [], links: [], attachments: []
+      },
+      {
+        id: 'i-4', key: 'DEMO-4', projectId, title: 'ユーザー通知機能', type: 'Story', status: 'To Do', priority: 'High',
+        assigneeId: 'u1', reporterId: 'u2', sprintId: sprint1, labels: ['feature'], 
+        createdAt: now, updatedAt: now, storyPoints: 8, watcherIds: [], comments: [], workLogs: [], history: [], links: [], attachments: []
+      },
+      {
+        id: 'i-5', key: 'DEMO-5', projectId, title: 'リリースマニュアルの作成', type: 'Task', status: 'To Do', priority: 'Low',
+        assigneeId: undefined, reporterId: 'u1', sprintId: 's-backlog', labels: ['docs'], 
+        createdAt: now, updatedAt: now, storyPoints: 1, watcherIds: [], comments: [], workLogs: [], history: [], links: [], attachments: []
+      }
+    ];
+
+    await db.issues.bulkAdd(issues);
+    
+    await db.notifications.add({
+      id: 'n-1', title: 'DEMO-2に割り当てられました', description: 'APIのCORSエラー修正',
+      read: false, createdAt: now, type: 'assignment', issueId: 'i-2'
+    });
+  });
 };
 
-export const createProject = (project: Partial<Project>) => {
-  const newProject: Project = {
-    id: `p${Date.now()}`,
-    key: project.key || 'NEW',
-    name: project.name || '新しいプロジェクト',
-    description: project.description || '',
-    leadId: CURRENT_USER_ID,
-    category: project.category || 'Software',
-    type: project.type || 'Kanban',
-    iconUrl: project.iconUrl || '📦',
-    ...project
-  } as Project;
-  
-  PROJECTS.push(newProject);
-  return newProject;
+export const clearDatabase = async () => {
+  await db.transaction('rw', [
+    db.users, db.projects, db.issues, db.sprints, db.notifications, 
+    db.automationRules, db.automationLogs, db.savedFilters, db.viewHistory, db.projectVersions
+  ], async () => {
+    await Promise.all([
+      db.users.clear(),
+      db.projects.clear(),
+      db.issues.clear(),
+      db.sprints.clear(),
+      db.notifications.clear(),
+      db.automationRules.clear(),
+      db.automationLogs.clear(),
+      db.savedFilters.clear(),
+      db.viewHistory.clear(),
+      db.projectVersions.clear()
+    ]);
+  });
 };
 
-export const getIssues = (projectId?: string) => {
-  if (projectId) return issues.filter(i => i.projectId === projectId);
-  return issues;
+export const checkIfDatabaseIsSeeded = async () => {
+  const user = await db.users.get('u1');
+  return !!user;
 };
 
-export const getIssueById = (id: string) => issues.find(i => i.id === id);
-
-export const getIssuesForUser = (userId: string) => issues.filter(i => i.assigneeId === userId);
-
-export const getSprints = (projectId: string) => SPRINTS.filter(s => s.projectId === projectId);
-
-export const createSprint = (projectId: string) => {
-  const projectSprints = SPRINTS.filter(s => s.projectId === projectId);
-  const nextNumber = projectSprints.length + 1;
-  const project = PROJECTS.find(p => p.id === projectId);
-  
-  const newSprint: Sprint = {
-    id: `s${Date.now()}`,
-    projectId,
-    name: `${project?.key || 'SPRINT'} スプリント ${nextNumber}`,
-    status: 'future'
-  };
-  
-  // Insert before the last item (Backlog container) if exists, or append
-  const backlogIndex = SPRINTS.findIndex(s => s.projectId === projectId && s.name.includes('バックログ'));
-  if (backlogIndex >= 0) {
-      SPRINTS.splice(backlogIndex, 0, newSprint);
-  } else {
-      SPRINTS.push(newSprint);
-  }
-  return newSprint;
-};
-
-export const getVersions = (projectId: string) => VERSIONS.filter(v => v.projectId === projectId);
-
-export const getNotifications = () => notifications;
-
-export const getUnreadMentionCount = () => {
-  return notifications.filter(n => !n.read && n.type === 'mention').length;
-};
-
-export const markAllNotificationsRead = () => {
-  notifications = notifications.map(n => ({ ...n, read: true }));
-  return notifications;
-};
-
-export const updateIssueStatus = (issueId: string, status: IssueStatus) => {
-  issues = issues.map(i => i.id === issueId ? { ...i, status } : i);
-  return issues.find(i => i.id === issueId);
-};
-
-export const addComment = (issueId: string, content: string) => {
-  const issue = issues.find(i => i.id === issueId);
-  if (issue) {
-    const newComment = {
-      id: `c${Date.now()}`,
-      authorId: CURRENT_USER_ID,
-      content,
-      createdAt: new Date().toISOString()
-    };
-    issue.comments.push(newComment);
-    return issue;
+export const loginAsUser = async (email: string) => {
+  const user = await db.users.where('email').equals(email).first();
+  if (user) {
+    return user;
   }
   return null;
 };
 
-export const getUserById = (id?: string) => USERS.find(u => u.id === id);
+export const registerUser = async (email: string, name: string) => {
+  const newUser = {
+    id: `u-${Date.now()}`,
+    name: name,
+    email: email,
+    avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
+  };
+  await db.users.add(newUser);
+  return newUser;
+};
 
-export const getCurrentUser = () => USERS.find(u => u.id === CURRENT_USER_ID);
+export const getCurrentUser = async () => {
+  return db.users.get(getCurrentUserId());
+};
 
-export const createIssue = (issue: Partial<Issue>) => {
-  const newId = `i${Date.now()}`;
-  const project = PROJECTS.find(p => p.id === issue.projectId);
-  const key = `${project?.key}-${Math.floor(Math.random() * 1000)}`;
-  
+export const updateUser = async (id: string, updates: Partial<User>) => {
+  return db.users.update(id, updates);
+};
+
+export const getUserStats = async (uid: string) => {
+  const assigned = await db.issues.where('assigneeId').equals(uid).count();
+  const reported = await db.issues.where('reporterId').equals(uid).count();
+  const leading = await db.projects.where('leadId').equals(uid).count();
+  return { assigned, reported, leading };
+};
+
+export const getProjects = async () => {
+  return db.projects.toArray();
+};
+
+export const getProjectById = async (id: string) => {
+  return db.projects.get(id);
+};
+
+export const createProject = async (project: Partial<Project>) => {
+  const newProject = {
+    id: `p-${Date.now()}`,
+    leadId: getCurrentUserId(),
+    category: 'Software',
+    type: 'Kanban',
+    ...project
+  } as Project;
+  await db.projects.add(newProject);
+  return newProject;
+};
+
+export const updateProject = async (id: string, updates: Partial<Project>) => {
+  return db.projects.update(id, updates);
+};
+
+export const deleteProject = async (id: string) => {
+  return db.projects.delete(id);
+};
+
+export const hasPermission = (userId: string, action: string, project?: Project) => {
+  if (userId === 'u1') return true;
+  if (action === 'delete_issue' || action === 'manage_project') return userId === 'u2'; 
+  return true; 
+};
+
+const createNotification = async (notif: Partial<Notification>) => {
+  await db.notifications.add({
+    id: `n-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    title: notif.title || 'システム通知',
+    description: notif.description || '',
+    read: false,
+    createdAt: new Date().toISOString(),
+    type: notif.type || 'system',
+    issueId: notif.issueId
+  } as Notification);
+};
+
+export const getNotifications = async () => {
+  return db.notifications.orderBy('createdAt').reverse().toArray();
+};
+
+export const getUnreadMentionCount = async () => {
+  return db.notifications.where('read').equals(0).count();
+};
+
+export const markAllNotificationsRead = async () => {
+  return db.notifications.toCollection().modify({ read: true });
+};
+
+const evaluateCondition = (condition: string, issue: Issue): boolean => {
+  if (!condition) return true;
+  const parts = condition.split(' ');
+  if (parts.length === 3) {
+    const [field, op, value] = parts;
+    const actual = (issue as any)[field];
+    if (op === '=') return String(actual) === value;
+    if (op === '!=') return String(actual) !== value;
+  }
+  return true;
+};
+
+export const runAutomation = async (trigger: string, issue: Issue) => {
+  const rules = await db.automationRules
+    .where('projectId')
+    .equals(issue.projectId)
+    .filter(r => r.trigger === trigger && r.enabled)
+    .toArray();
+
+  for (const rule of rules) {
+    if (!evaluateCondition(rule.condition, issue)) continue;
+
+    try {
+      if (rule.action === 'assign_reporter') {
+        await updateIssue(issue.id, { assigneeId: issue.reporterId });
+      } else if (rule.action === 'add_comment') {
+        await addComment(issue.id, '自動化ルールによってシステムコメントが追加されました。');
+      } else if (rule.action === 'set_priority_high') {
+        await updateIssue(issue.id, { priority: 'High' });
+      }
+
+      await db.automationLogs.add({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        ruleId: rule.id,
+        status: 'success',
+        message: `ルール「${rule.name}」が実行されました。`,
+        executedAt: new Date().toISOString()
+      });
+      await db.automationRules.update(rule.id, { lastRun: new Date().toISOString() });
+    } catch (e) {
+      console.error("Automation error:", e);
+      await db.automationLogs.add({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        ruleId: rule.id,
+        status: 'failure',
+        message: `エラー: ${e instanceof Error ? e.message : String(e)}`,
+        executedAt: new Date().toISOString()
+      });
+    }
+  }
+};
+
+export const getAutomationRules = async (projectId: string) => {
+  return db.automationRules.where('projectId').equals(projectId).toArray();
+};
+
+export const toggleAutomationRule = async (id: string, enabled: boolean) => {
+  return db.automationRules.update(id, { enabled });
+};
+
+export const createAutomationRule = async (rule: Partial<AutomationRule>) => {
+  const newRule = {
+    id: `ar-${Date.now()}`,
+    enabled: true,
+    ...rule
+  } as AutomationRule;
+  await db.automationRules.add(newRule);
+  return newRule;
+};
+
+export const getAutomationLogs = async (ruleId: string) => {
+  const logs = await db.automationLogs.where('ruleId').equals(ruleId).toArray();
+  return logs.sort((a, b) => b.executedAt.localeCompare(a.executedAt));
+};
+
+export const getIssueById = async (id: string) => {
+  return db.issues.get(id);
+};
+
+export const getIssues = async (projectId?: string) => {
+  if (projectId) {
+    return db.issues.where('projectId').equals(projectId).toArray();
+  }
+  return db.issues.toArray();
+};
+
+export const getIssuesForUser = async (userId: string) => {
+  return db.issues.where('assigneeId').equals(userId).toArray();
+};
+
+export const createIssue = async (issue: Partial<Issue>) => {
+  const project = await db.projects.get(issue.projectId!);
+  const count = await db.issues.where('projectId').equals(issue.projectId!).count();
+  const curUser = getCurrentUserId();
   const newIssue: Issue = {
-    id: newId,
-    key: key,
+    id: `i-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    key: `${project?.key}-${count + 101}`,
     projectId: issue.projectId!,
     title: issue.title || '無題',
     type: issue.type || 'Task',
     status: issue.status || 'To Do',
     priority: issue.priority || 'Medium',
+    reporterId: curUser,
     assigneeId: issue.assigneeId,
-    reporterId: CURRENT_USER_ID,
     labels: [],
     comments: [],
+    workLogs: [],
+    history: [{
+      id: `h-${Date.now()}`,
+      authorId: curUser,
+      field: 'status',
+      from: null,
+      to: issue.status || 'To Do',
+      createdAt: new Date().toISOString()
+    }],
+    links: [],
+    attachments: [],
+    watcherIds: [curUser],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...issue
   } as Issue;
+  
+  await db.issues.add(newIssue);
+  
+  if (newIssue.assigneeId && newIssue.assigneeId !== curUser) {
+    await createNotification({
+      title: '新しい課題が割り当てられました',
+      description: `${newIssue.key}: ${newIssue.title}`,
+      type: 'assignment',
+      issueId: newIssue.id
+    });
+  }
 
-  issues.push(newIssue);
+  await runAutomation('issue_created', newIssue);
   return newIssue;
+};
+
+export const updateIssue = async (id: string, updates: Partial<Issue>) => {
+  const old = await db.issues.get(id);
+  if (!old) return;
+  const curUser = getCurrentUserId();
+
+  const historyEntries: any[] = [];
+  const changes: any = { ...updates, updatedAt: new Date().toISOString() };
+
+  for (const [key, value] of Object.entries(updates)) {
+    if ((old as any)[key] !== value) {
+      historyEntries.push({
+        id: `h-${Date.now()}-${key}`,
+        authorId: curUser,
+        field: key,
+        from: (old as any)[key],
+        to: value,
+        createdAt: new Date().toISOString()
+      });
+
+      if (key === 'assigneeId' && value && value !== curUser) {
+        await createNotification({
+          title: '課題があなたに割り当てられました',
+          description: `${old.key}: ${old.title}`,
+          type: 'assignment',
+          issueId: old.id
+        });
+      }
+
+      if (key === 'status') {
+        const watchers = old.watcherIds || [];
+        for (const watcherId of watchers.filter(wid => wid !== curUser)) {
+          await createNotification({
+            title: `課題のステータスが「${STATUS_LABELS[value as IssueStatus]}」に変更されました`,
+            description: old.key,
+            type: 'system',
+            issueId: old.id
+          });
+        }
+      }
+    }
+  }
+
+  const newHistory = [...(old.history || []), ...historyEntries];
+  await db.issues.update(id, { ...changes, history: newHistory });
+  
+  const updated = await db.issues.get(id);
+  if (updates.status && updates.status !== old.status && updated) {
+    await runAutomation('status_changed', updated);
+  }
+  return updated;
+};
+
+export const updateIssueStatus = async (id: string, status: IssueStatus) => {
+  return updateIssue(id, { status });
+};
+
+export const deleteIssue = async (id: string) => {
+  const issue = await db.issues.get(id);
+  if (issue && hasPermission(getCurrentUserId(), 'delete_issue')) {
+    await db.issues.delete(id);
+    return true;
+  }
+  return false;
+};
+
+export const addAttachment = async (issueId: string, file: File) => {
+  const issue = await db.issues.get(issueId);
+  if (!issue) return;
+
+  const reader = new FileReader();
+  return new Promise<void>((resolve, reject) => {
+    reader.onload = async () => {
+      const newAttachment: Attachment = {
+        id: `at-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        data: reader.result as string,
+        createdAt: new Date().toISOString()
+      };
+      const attachments = [...(issue.attachments || []), newAttachment];
+      await db.issues.update(issueId, { attachments, updatedAt: new Date().toISOString() });
+      resolve();
+    };
+    reader.onerror = () => reject(new Error("File upload failed"));
+    reader.readAsDataURL(file);
+  });
+};
+
+export const addComment = async (id: string, text: string) => {
+  const issue = await db.issues.get(id);
+  if (issue) {
+    const curUser = getCurrentUserId();
+    const comments = [...(issue.comments || []), { 
+      id: `c-${Date.now()}`, 
+      authorId: curUser, 
+      content: text, 
+      createdAt: new Date().toISOString() 
+    }];
+    await db.issues.update(id, { comments, updatedAt: new Date().toISOString() });
+    
+    const watchers = issue.watcherIds || [];
+    for (const watcherId of watchers.filter(wid => wid !== curUser)) {
+      await createNotification({
+        title: '新しいコメントが追加されました',
+        description: `${issue.key}: ${text.substring(0, 30)}...`,
+        type: 'mention',
+        issueId: issue.id
+      });
+    }
+
+    await runAutomation('comment_added', issue);
+  }
+};
+
+export const getSubtasks = async (parentId: string) => {
+  return db.issues.where('parentId').equals(parentId).toArray();
+};
+
+export const addIssueLink = async (issueId: string, targetId: string, type: LinkType) => {
+  const issue = await db.issues.get(issueId);
+  if (!issue) return;
+  const links = [...(issue.links || []), { id: `l-${Date.now()}`, type, outwardIssueId: targetId }];
+  return db.issues.update(issueId, { links });
+};
+
+export const logWork = async (issueId: string, seconds: number, comment?: string) => {
+  const issue = await db.issues.get(issueId);
+  if (!issue) return;
+  const newLog: WorkLog = {
+    id: `wl-${Date.now()}`,
+    authorId: getCurrentUserId(),
+    timeSpentSeconds: seconds,
+    comment,
+    createdAt: new Date().toISOString()
+  };
+  const workLogs = [...(issue.workLogs || []), newLog];
+  return db.issues.update(issueId, { workLogs, updatedAt: new Date().toISOString() });
+};
+
+export const toggleWatch = async (issueId: string) => {
+  const issue = await db.issues.get(issueId);
+  if (!issue) return;
+  const curUser = getCurrentUserId();
+  const watcherIds = issue.watcherIds || [];
+  const index = watcherIds.indexOf(curUser);
+  if (index > -1) {
+    watcherIds.splice(index, 1);
+  } else {
+    watcherIds.push(curUser);
+  }
+  return db.issues.update(issueId, { watcherIds });
+};
+
+export const recordView = async (issueId: string) => {
+  const curUser = getCurrentUserId();
+  const id = `${curUser}-${issueId}`;
+  return db.viewHistory.put({
+    id,
+    userId: curUser,
+    issueId,
+    viewedAt: new Date().toISOString()
+  });
+};
+
+export const getRecentIssues = async () => {
+  const curUser = getCurrentUserId();
+  const history = await db.viewHistory
+    .where('userId')
+    .equals(curUser)
+    .toArray();
+  
+  const recentHistory = history
+    .sort((a, b) => b.viewedAt.localeCompare(a.viewedAt))
+    .slice(0, 10);
+    
+  const issueIds = recentHistory.map(h => h.issueId);
+  if (issueIds.length === 0) return [];
+  
+  const issues = await db.issues.where('id').anyOf(issueIds).toArray();
+  
+  return issueIds.map(id => issues.find(i => i.id === id)).filter(Boolean) as Issue[];
+};
+
+export const getSprints = async (projectId: string) => {
+  return db.sprints.where('projectId').equals(projectId).toArray();
+};
+
+export const createSprint = async (projectId: string) => {
+  const count = await db.sprints.where('projectId').equals(projectId).count();
+  const newSprint: Sprint = {
+    id: `s-${Date.now()}`,
+    name: `Sprint ${count + 1}`,
+    projectId,
+    status: 'future'
+  };
+  await db.sprints.add(newSprint);
+  return newSprint;
+};
+
+export const updateSprintStatus = async (id: string, status: 'active' | 'future' | 'completed') => {
+  return db.sprints.update(id, { status });
+};
+
+export const getVersions = async (projectId: string) => {
+  return db.projectVersions.where('projectId').equals(projectId).toArray();
+};
+
+export const createVersion = async (version: Partial<Version>) => {
+  const newVersion = {
+    id: `v-${Date.now()}`,
+    status: 'unreleased',
+    ...version
+  } as Version;
+  await db.projectVersions.add(newVersion);
+  return newVersion;
+};
+
+export const getSavedFilters = async () => {
+  return db.savedFilters.toArray();
+};
+
+export const saveFilter = async (name: string, query: string) => {
+  const newFilter: SavedFilter = {
+    id: `f-${Date.now()}`,
+    name,
+    query,
+    ownerId: getCurrentUserId(),
+    isFavorite: false
+  };
+  await db.savedFilters.add(newFilter);
+  return newFilter;
+};
+
+export const executeJQL = (jql: string, issues: Issue[]): Issue[] => {
+  try {
+    const parts = jql.split(/ AND /i);
+    return issues.filter(issue => {
+      return parts.every(part => {
+        const match = part.match(/(\w+)\s*=\s*['"]?([^'"]+)['"]?/);
+        if (!match) return true;
+        const [_, field, val] = match;
+        return String((issue as any)[field]) === val;
+      });
+    });
+  } catch (e) {
+    return issues;
+  }
+};
+
+export const setupInitialProject = async (name: string, key: string, type: 'Scrum' | 'Kanban') => {
+  const project = await createProject({ name, key, type });
+  localStorage.setItem('hasSetup', 'true');
+  return project;
+};
+
+export const getProjectStats = async (pid: string) => {
+  const issues = await db.issues.where('projectId').equals(pid).toArray();
+  const workload = SEED_USERS.map(u => ({ 
+    userName: u.name, 
+    count: issues.filter(i => i.assigneeId === u.id).length 
+  }));
+
+  const epics = issues.filter(i => i.type === 'Epic');
+  const epicProgress = epics.map(epic => {
+    const children = issues.filter(i => i.parentId === epic.id);
+    const doneCount = children.filter(i => i.status === 'Done').length;
+    const percent = children.length > 0 ? Math.round((doneCount / children.length) * 100) : 0;
+    return { id: epic.id, title: epic.title, percent };
+  });
+
+  return { workload, epicProgress };
 };

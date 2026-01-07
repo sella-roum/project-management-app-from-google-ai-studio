@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { PROJECTS, createIssue, USERS, TYPE_LABELS, PRIORITY_LABELS } from '../../services/mockData';
+import { getProjects, createIssue, USERS, TYPE_LABELS, PRIORITY_LABELS } from '../../services/mockData';
 import { IssuePriority, IssueType, IssueStatus } from '../../types';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 interface Props {
   isOpen: boolean;
@@ -11,28 +12,31 @@ interface Props {
 }
 
 export const CreateIssueModal: React.FC<Props> = ({ isOpen, onClose, preselectedStatus, defaultProjectId }) => {
-  const [projectId, setProjectId] = useState(defaultProjectId || PROJECTS[0]?.id || '');
+  const projects = useLiveQuery(() => getProjects()) || [];
+  
+  const [projectId, setProjectId] = useState('');
   const [type, setType] = useState<IssueType>('Story');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<IssuePriority>('Medium');
   const [assigneeId, setAssigneeId] = useState('');
 
-  // Update projectId when defaultProjectId changes
   useEffect(() => {
     if (defaultProjectId) {
       setProjectId(defaultProjectId);
+    } else if (projects.length > 0 && !projectId) {
+      setProjectId(projects[0].id);
     }
-  }, [defaultProjectId]);
+  }, [defaultProjectId, projects]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) return;
 
-    createIssue({
-      projectId,
+    await createIssue({
+      projectId: projectId || projects[0]?.id,
       type,
       title,
       description,
@@ -51,7 +55,7 @@ export const CreateIssueModal: React.FC<Props> = ({ isOpen, onClose, preselected
     <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center pointer-events-none">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto" onClick={onClose} />
       
-      <div className="bg-white w-full md:w-[600px] md:rounded-lg rounded-t-xl h-[85vh] md:h-auto flex flex-col pointer-events-auto animate-slideUp md:animate-fadeIn shadow-2xl">
+      <div className="bg-white w-full md:w-[600px] md:rounded-lg rounded-t-xl h-[85vh] md:h-auto flex flex-col pointer-events-auto animate-slideUp md:animate-fadeIn shadow-2xl relative z-10">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-800">課題を作成</h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
@@ -65,9 +69,9 @@ export const CreateIssueModal: React.FC<Props> = ({ isOpen, onClose, preselected
             <select 
               value={projectId} 
               onChange={(e) => setProjectId(e.target.value)}
-              className="w-full p-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full p-2 bg-white border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
             >
-              {PROJECTS.map(p => <option key={p.id} value={p.id}>{p.iconUrl} {p.name}</option>)}
+              {projects.map(p => <option key={p.id} value={p.id}>{p.iconUrl} {p.name}</option>)}
             </select>
           </div>
 
@@ -116,7 +120,7 @@ export const CreateIssueModal: React.FC<Props> = ({ isOpen, onClose, preselected
               <select 
                 value={priority} 
                 onChange={(e) => setPriority(e.target.value as IssuePriority)}
-                className="w-full p-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
+                className="w-full p-2 bg-white border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
               >
                 {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
@@ -128,7 +132,7 @@ export const CreateIssueModal: React.FC<Props> = ({ isOpen, onClose, preselected
               <select 
                 value={assigneeId} 
                 onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full p-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
+                className="w-full p-2 bg-white border border-gray-200 rounded focus:ring-2 focus:ring-primary focus:outline-none"
               >
                 <option value="">未割り当て</option>
                 {USERS.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
