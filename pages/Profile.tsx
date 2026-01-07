@@ -1,10 +1,12 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getCurrentUser, updateUser, getUserStats, getCurrentUserId } from '../services/mockData';
 import { resetApp } from '../services/appReset';
 import { useConfirm } from '../providers/ConfirmProvider';
 import { LogOut, Bell, HelpCircle, ChevronRight, Save, Edit2, Languages, Camera, RefreshCcw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const MenuItem = ({ 
   icon: Icon, 
@@ -51,6 +53,7 @@ export const Profile = () => {
   const user = useLiveQuery(() => getCurrentUser());
   const stats = useLiveQuery(() => getUserStats(getCurrentUserId()));
   const { confirm } = useConfirm();
+  const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -66,7 +69,26 @@ export const Profile = () => {
       setEditEmail(user.email || 'user@example.com');
       setEditAvatar(user.avatarUrl || '');
     }
+    // Load notification setting
+    const storedNotif = localStorage.getItem('notificationsEnabled');
+    setNotificationsEnabled(storedNotif === 'true');
   }, [user]);
+
+  const toggleNotifications = () => {
+    const newState = !notificationsEnabled;
+    setNotificationsEnabled(newState);
+    localStorage.setItem('notificationsEnabled', String(newState));
+  };
+
+  const handleLanguageChange = async () => {
+    // Mock language change for now
+    const confirmed = await confirm({
+      title: '言語の変更',
+      message: '現在は日本語のみサポートされています。',
+      confirmText: 'OK',
+      cancelText: '閉じる'
+    });
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -83,7 +105,6 @@ export const Profile = () => {
     });
 
     if (isConfirmed) {
-      // Set processing to true to prevent rendering the UI that depends on the DB
       setIsProcessing(true); 
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUserId');
@@ -100,7 +121,7 @@ export const Profile = () => {
     });
 
     if (isConfirmed) {
-      setIsProcessing(true); // Lock UI
+      setIsProcessing(true);
       const success = await resetApp();
       if (success) {
         window.location.reload();
@@ -111,9 +132,6 @@ export const Profile = () => {
     }
   };
 
-  // Guard clause: If processing (logging out/resetting) or loading user, show simple loader.
-  // This prevents the component from trying to access `user` properties or rendering sub-components 
-  // that query the DB while the DB is being closed/deleted.
   if (isProcessing || (!user && !isProcessing)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -124,7 +142,6 @@ export const Profile = () => {
     );
   }
 
-  // Double check user existence for TypeScript safety
   if (!user) return null;
 
   return (
@@ -205,9 +222,9 @@ export const Profile = () => {
               label="通知を有効にする" 
               toggle 
               active={notificationsEnabled} 
-              onClick={() => setNotificationsEnabled(!notificationsEnabled)} 
+              onClick={toggleNotifications} 
             />
-            <MenuItem icon={Languages} label="言語 (日本語)" />
+            <MenuItem icon={Languages} label="言語 (日本語)" onClick={handleLanguageChange} />
           </div>
         </div>
 
@@ -222,13 +239,13 @@ export const Profile = () => {
         <div>
           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 ml-1">サポート</h3>
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <MenuItem icon={HelpCircle} label="ヘルプセンター" />
+            <MenuItem icon={HelpCircle} label="ヘルプセンター" onClick={() => navigate('/help')} />
           </div>
         </div>
       </div>
       
       <p className="text-center text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] mt-12 pb-12">
-        JiraMobile Clone v1.2.1 (Fixes Applied)
+        JiraMobile Clone v1.3.0
       </p>
     </div>
   );

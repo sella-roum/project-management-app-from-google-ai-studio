@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Issue, IssueStatus, IssuePriority, LinkType, WorkLog, Version } from '../types';
 import { X, Share2, MoreHorizontal, ChevronDown, Trash2, Plus, Link as LinkIcon, History as HistoryIcon, MessageSquare, Paperclip, Download, Search, FileText, ExternalLink, Timer, ChevronRight, Eye, EyeOff, Zap, LayoutList, CheckCircle2, ArrowRight } from 'lucide-react';
@@ -6,6 +7,7 @@ import { IssueTypeIcon } from '../components/Common/IssueTypeIcon';
 import { Avatar } from '../components/Common/Avatar';
 import { updateIssue, deleteIssue, USERS, STATUS_LABELS, addComment, db, WORKFLOW_TRANSITIONS, getSubtasks, addIssueLink, getCurrentUserId, recordView, logWork, createIssue, toggleWatch, addAttachment, hasPermission, getVersions } from '../services/mockData';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useConfirm } from '../providers/ConfirmProvider';
 
 interface Props {
   issue: Issue | null;
@@ -39,6 +41,7 @@ export const IssueDrawer: React.FC<Props> = ({ issue: initialIssue, onClose }) =
   const projectVersions = useLiveQuery(() => issue ? getVersions(issue.projectId) : [], [issue?.projectId]) || [];
 
   const currentUserId = getCurrentUserId();
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     if (issue) {
@@ -95,10 +98,20 @@ export const IssueDrawer: React.FC<Props> = ({ issue: initialIssue, onClose }) =
   };
 
   const handleDelete = async () => {
-    if (confirm('この課題を完全に削除してもよろしいですか？')) {
+    const shouldDelete = await confirm({
+      title: '課題の削除',
+      message: 'この課題を完全に削除してもよろしいですか？\nこの操作は取り消せません。',
+      confirmText: '削除する',
+      isDestructive: true
+    });
+
+    if (shouldDelete) {
       const success = await deleteIssue(issue.id);
-      if (success) onClose();
-      else alert('権限がありません。');
+      if (success) {
+        onClose();
+      } else {
+        alert('課題を削除できませんでした。権限がない可能性があります。');
+      }
     }
   };
 
@@ -149,7 +162,7 @@ export const IssueDrawer: React.FC<Props> = ({ issue: initialIssue, onClose }) =
              <input 
                type="text" value={title} onChange={(e) => setTitle(e.target.value)} 
                onBlur={() => updateIssue(issue.id, { title })} 
-               className="text-2xl font-black text-secondary leading-tight w-full outline-none focus:ring-4 focus:ring-primary/5 rounded-xl transition-all p-1" 
+               className="text-2xl font-black text-secondary leading-tight w-full outline-none bg-white focus:ring-4 focus:ring-primary/5 border border-transparent hover:border-gray-200 focus:border-primary/20 rounded-xl transition-all p-2" 
              />
              <div className="mt-4 flex flex-wrap gap-3">
                <div className="relative">

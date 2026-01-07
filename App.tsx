@@ -1,14 +1,17 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, useNavigate, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { BottomNav } from './components/Layout/BottomNav';
 import { Sidebar } from './components/Layout/Sidebar';
+import { MobileSidebar } from './components/Layout/MobileSidebar';
 import { Home } from './pages/Home';
 import { Projects } from './pages/Projects';
 import { ProjectView } from './pages/ProjectView';
 import { Search } from './pages/Search';
 import { Notifications } from './pages/Notifications';
 import { Profile } from './pages/Profile';
+import { HelpCenter } from './pages/HelpCenter';
 import { Dashboards } from './pages/Dashboards';
 import { Login } from './pages/Login';
 import { Welcome } from './pages/Welcome';
@@ -20,12 +23,12 @@ import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { Issue, IssueStatus } from './types';
 import { Menu, Plus, Search as SearchIcon } from 'lucide-react';
 
-const TopBar = ({ onCreate }: { onCreate: () => void }) => {
+const TopBar = ({ onCreate, onMenuClick }: { onCreate: () => void, onMenuClick: () => void }) => {
   const navigate = useNavigate();
   return (
     <div className="bg-white border-b border-gray-200 h-14 flex items-center justify-between px-4 sticky top-0 z-30 shrink-0">
       <div className="flex items-center gap-3">
-        <button className="p-2 -ml-2 hover:bg-gray-100 rounded-full md:hidden">
+        <button onClick={onMenuClick} className="p-2 -ml-2 hover:bg-gray-100 rounded-full md:hidden">
           <Menu size={24} className="text-secondary" />
         </button>
         <span onClick={() => navigate('/')} className="font-bold text-xl text-primary flex items-center gap-1 cursor-pointer">
@@ -70,6 +73,8 @@ const AppContent = () => {
   const [showSetup, setShowSetup] = useState(false);
   const [createStatus, setCreateStatus] = useState<IssueStatus | undefined>(undefined);
   const [createProjectId, setCreateProjectId] = useState<string | undefined>(undefined);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -79,13 +84,14 @@ const AppContent = () => {
     const hasSetup = localStorage.getItem('hasSetup') === 'true';
     const isAuthPage = location.pathname === '/welcome' || location.pathname === '/login';
     
-    // Logic: If logged in, setup not done, and not on auth pages -> Show Setup
-    // Crucially, if conditions are NOT met, hide it.
     if (isLoggedIn && !hasSetup && !isAuthPage) {
       setShowSetup(true);
     } else {
       setShowSetup(false);
     }
+
+    // Close mobile nav on route change
+    setMobileNavOpen(false);
   }, [location.pathname]);
 
   const handleOpenCreateModal = (status?: IssueStatus, projectId?: string) => {
@@ -97,12 +103,14 @@ const AppContent = () => {
   const handleSetupComplete = () => {
     localStorage.setItem('hasSetup', 'true');
     setShowSetup(false);
-    navigate('/'); // Ensure we are on home
+    navigate('/');
   };
 
   return (
     <div className="flex flex-col h-full bg-bgLight">
       {showSetup && <SetupWizard onComplete={handleSetupComplete} />}
+      <MobileSidebar isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      
       <Routes>
         <Route path="/welcome" element={<Welcome />} />
         <Route element={<InitCheck />}>
@@ -110,7 +118,7 @@ const AppContent = () => {
           <Route element={<PrivateRoute />}>
             <Route element={
               <div className="flex flex-col h-full">
-                <TopBar onCreate={() => handleOpenCreateModal()} />
+                <TopBar onCreate={() => handleOpenCreateModal()} onMenuClick={() => setMobileNavOpen(true)} />
                 <div className="flex flex-1 overflow-hidden">
                   <Sidebar />
                   <main className="flex-1 overflow-y-auto no-scrollbar relative">
@@ -127,6 +135,7 @@ const AppContent = () => {
               <Route path="/search" element={<Search onOpenIssue={setSelectedIssue} />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/help" element={<HelpCenter />} />
             </Route>
           </Route>
         </Route>

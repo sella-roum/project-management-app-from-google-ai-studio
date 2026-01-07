@@ -79,6 +79,7 @@ export interface Project {
   category: 'Software' | 'Business';
   type: 'Scrum' | 'Kanban';
   columnSettings?: Record<IssueStatus, { limit?: number }>;
+  starred?: boolean;
 }
 
 export interface AutomationRule {

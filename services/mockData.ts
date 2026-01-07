@@ -1,4 +1,5 @@
 
+
 import { Dexie, Table } from 'dexie';
 import { Issue, Project, User, Sprint, Notification, IssueStatus, IssuePriority, IssueType, Version, AutomationRule, SavedFilter, ViewHistory, WorkLog, AutomationLog, Attachment, LinkType } from '../types';
 
@@ -101,7 +102,8 @@ export const seedDatabase = async () => {
       leadId: 'u1',
       category: 'Software',
       type: 'Scrum',
-      iconUrl: '🚀'
+      iconUrl: '🚀',
+      starred: true
     });
 
     const sprint1 = 's-1';
@@ -224,6 +226,7 @@ export const createProject = async (project: Partial<Project>) => {
     leadId: getCurrentUserId(),
     category: 'Software',
     type: 'Kanban',
+    starred: false,
     ...project
   } as Project;
   await db.projects.add(newProject);
@@ -238,9 +241,17 @@ export const deleteProject = async (id: string) => {
   return db.projects.delete(id);
 };
 
+export const toggleProjectStar = async (projectId: string) => {
+  const project = await db.projects.get(projectId);
+  if (project) {
+    await db.projects.update(projectId, { starred: !project.starred });
+  }
+};
+
 export const hasPermission = (userId: string, action: string, project?: Project) => {
   if (userId === 'u1') return true;
-  if (action === 'delete_issue' || action === 'manage_project') return userId === 'u2'; 
+  // In demo mode, we allow all users to delete issues
+  if (action === 'manage_project') return userId === 'u2'; 
   return true; 
 };
 
@@ -261,7 +272,12 @@ export const getNotifications = async () => {
 };
 
 export const getUnreadMentionCount = async () => {
-  return db.notifications.where('read').equals(0).count();
+  // Use filter because boolean fields in IndexedDB can sometimes be tricky with exact matches
+  return db.notifications.filter(n => !n.read).count();
+};
+
+export const markNotificationRead = async (id: string) => {
+  return db.notifications.update(id, { read: true });
 };
 
 export const markAllNotificationsRead = async () => {

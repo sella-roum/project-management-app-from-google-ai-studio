@@ -1,14 +1,31 @@
 import React, { useState } from 'react';
-import { getProjects, CATEGORY_LABELS } from '../services/mockData';
+import { getProjects, CATEGORY_LABELS, toggleProjectStar } from '../services/mockData';
 import { useNavigate } from 'react-router-dom';
 import { Star, MoreHorizontal } from 'lucide-react';
 import { CreateProjectModal } from '../components/Modals/CreateProjectModal';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Project } from '../types';
 
 export const Projects = () => {
   const projects = useLiveQuery(() => getProjects()) || [];
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
+
+  const handleStarClick = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
+    await toggleProjectStar(projectId);
+  };
+
+  const handleProjectCreated = (newProject: Project) => {
+    setIsModalOpen(false);
+    navigate(`/projects/${newProject.id}`);
+  };
+
+  // Sort: Starred first, then by name
+  const sortedProjects = [...projects].sort((a, b) => {
+    if (a.starred === b.starred) return a.name.localeCompare(b.name);
+    return a.starred ? -1 : 1;
+  });
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
@@ -23,7 +40,7 @@ export const Projects = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {projects.map(project => (
+        {sortedProjects.map(project => (
           <div 
             key={project.id}
             onClick={() => navigate(`/projects/${project.id}`)}
@@ -35,8 +52,11 @@ export const Projects = () => {
                <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center text-2xl shadow-sm">
                   {project.iconUrl}
                </div>
-               <button className="text-gray-400 hover:text-yellow-400 transition-colors">
-                 <Star size={20} />
+               <button 
+                 onClick={(e) => handleStarClick(e, project.id)}
+                 className={`transition-colors ${project.starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`}
+               >
+                 <Star size={20} fill={project.starred ? "currentColor" : "none"} />
                </button>
             </div>
             
@@ -62,7 +82,7 @@ export const Projects = () => {
       <CreateProjectModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onCreated={() => {}} 
+        onCreated={handleProjectCreated} 
       />
     </div>
   );

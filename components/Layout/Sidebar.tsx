@@ -1,13 +1,17 @@
 
+
 import React from 'react';
 import { Home, Search, FolderKanban, Bell, User, LayoutDashboard } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const SidebarItem = ({ icon: Icon, label, path, active }: { icon: any, label: string, path: string, active: boolean }) => {
+export const SidebarItem = ({ icon: Icon, label, path, active, onClick }: { icon: any, label: string, path: string, active: boolean, onClick?: () => void }) => {
   const navigate = useNavigate();
   return (
     <button 
-      onClick={() => navigate(path)}
+      onClick={() => {
+        navigate(path);
+        if (onClick) onClick();
+      }}
       className={`flex items-center w-full px-6 py-3 gap-3 transition-colors ${active ? 'text-primary bg-blue-50 border-r-4 border-primary' : 'text-gray-500 hover:bg-gray-50'}`}
     >
       <Icon size={20} />

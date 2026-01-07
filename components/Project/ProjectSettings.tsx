@@ -1,9 +1,12 @@
 
+
 import React, { useState } from 'react';
 import { Project } from '../../types';
 import { updateProject, deleteProject, CATEGORY_LABELS, WORKFLOW_TRANSITIONS, STATUS_LABELS } from '../../services/mockData';
 import { Save, Shield, Workflow, Bell, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { WorkflowEditorModal } from '../Modals/WorkflowEditorModal';
+import { NotificationSchemeModal } from '../Modals/NotificationSchemeModal';
 
 interface Props {
   project: Project;
@@ -15,6 +18,10 @@ export const ProjectSettings: React.FC<Props> = ({ project }) => {
   const [description, setDescription] = useState(project.description);
   const [category, setCategory] = useState(project.category);
   const [isSaved, setIsSaved] = useState(false);
+  
+  const [showWorkflowEditor, setShowWorkflowEditor] = useState(false);
+  const [showNotifEditor, setShowNotifEditor] = useState(false);
+
   const navigate = useNavigate();
 
   const handleSave = (e: React.FormEvent) => {
@@ -136,7 +143,7 @@ export const ProjectSettings: React.FC<Props> = ({ project }) => {
             ))}
           </div>
           <div className="pt-4 mt-4 border-t border-gray-100 flex justify-end">
-             <button className="text-xs font-bold text-primary hover:underline">エディタでワークフローを編集</button>
+             <button onClick={() => setShowWorkflowEditor(true)} className="text-xs font-bold text-primary hover:underline">エディタでワークフローを編集</button>
           </div>
         </div>
       )}
@@ -184,12 +191,16 @@ export const ProjectSettings: React.FC<Props> = ({ project }) => {
                       <div className="font-bold text-gray-800 text-sm">{row.e}</div>
                       <div className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">{row.r}</div>
                    </div>
-                   <button className="text-[10px] font-bold text-primary">編集</button>
+                   <button onClick={() => setShowNotifEditor(true)} className="text-[10px] font-bold text-primary">編集</button>
                 </div>
               ))}
            </div>
         </div>
       )}
+
+      {/* Modals */}
+      <WorkflowEditorModal isOpen={showWorkflowEditor} onClose={() => setShowWorkflowEditor(false)} onSave={() => setShowWorkflowEditor(false)} />
+      <NotificationSchemeModal isOpen={showNotifEditor} onClose={() => setShowNotifEditor(false)} onSave={() => setShowNotifEditor(false)} />
     </div>
   );
 };

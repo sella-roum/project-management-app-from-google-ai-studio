@@ -1,5 +1,7 @@
+
+
 import React, { useState } from 'react';
-import { getNotifications, markAllNotificationsRead, getIssueById } from '../services/mockData';
+import { getNotifications, markAllNotificationsRead, getIssueById, markNotificationRead } from '../services/mockData';
 import { Bell, MessageSquare, UserPlus } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import { Issue } from '../types';
@@ -18,6 +20,11 @@ export const Notifications = () => {
   };
 
   const handleNotificationClick = async (notif: any) => {
+    // Mark as read immediately
+    if (!notif.read) {
+      await markNotificationRead(notif.id);
+    }
+
     if (notif.issueId) {
       const issue = await getIssueById(notif.issueId);
       if (issue) {
@@ -58,7 +65,7 @@ export const Notifications = () => {
                {getIcon(notif.type)}
             </div>
             <div className="flex-1">
-               <p className="text-sm font-medium text-gray-900 mb-0.5">{notif.title}</p>
+               <p className={`text-sm text-gray-900 mb-0.5 ${!notif.read ? 'font-bold' : 'font-medium'}`}>{notif.title}</p>
                <p className="text-sm text-gray-600 mb-2">{notif.description}</p>
                <span className="text-xs text-gray-400">
                  {new Date(notif.createdAt).toLocaleDateString()} {new Date(notif.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
