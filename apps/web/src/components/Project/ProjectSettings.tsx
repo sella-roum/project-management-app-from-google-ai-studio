@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { Project } from "../../types";
 import {
-  updateProject,
-  deleteProject,
   CATEGORY_LABELS,
-  WORKFLOW_TRANSITIONS,
   STATUS_LABELS,
-} from "../../services/mockData";
+  WORKFLOW_TRANSITIONS,
+} from "@repo/core";
+import { updateProject, deleteProject } from "../../services/mockData";
 import { Save, Shield, Workflow, Bell, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { WorkflowEditorModal } from "../Modals/WorkflowEditorModal";

@@ -14,8 +14,8 @@ import {
   X,
 } from "lucide-react";
 // Fix: Removed deleteSprint from imports as it is not exported from mockData.ts and not used in this file
+import { STATUS_LABELS } from "@repo/core";
 import {
-  STATUS_LABELS,
   createSprint,
   updateSprintStatus,
   updateIssue,

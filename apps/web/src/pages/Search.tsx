@@ -10,14 +10,12 @@ import {
   HelpCircle,
   Terminal as TerminalIcon,
 } from "lucide-react";
+import { PRIORITY_LABELS, TYPE_LABELS, executeJQL } from "@repo/core";
 import {
   db,
   getCurrentUserId,
   getProjects,
-  TYPE_LABELS,
-  PRIORITY_LABELS,
   getSavedFilters,
-  executeJQL,
   saveFilter,
 } from "../services/mockData";
 import { IssueCard } from "../components/Common/IssueCard";

@@ -1,13 +1,25 @@
 import { Dexie, Table } from "dexie";
 import {
+  buildProjectStats,
+  DEFAULT_NOTIFICATION_SCHEME,
+  evaluateAutomationCondition,
+  getSeedIssues,
+  getSeedNotifications,
+  getSeedProjects,
+  getSeedSprints,
+  getSeedUsers,
+  selectRecentIssues,
+  sortAutomationLogsByExecutedAt,
+  STATUS_LABELS,
+  WORKFLOW_TRANSITIONS,
+} from "@repo/core";
+import {
   Issue,
   Project,
   User,
   Sprint,
   Notification,
   IssueStatus,
-  IssuePriority,
-  IssueType,
   Version,
   AutomationRule,
   SavedFilter,
@@ -17,49 +29,6 @@ import {
   Attachment,
   LinkType,
 } from "../types";
-
-export const STATUS_LABELS: Record<IssueStatus, string> = {
-  "To Do": "未着手",
-  "In Progress": "進行中",
-  "In Review": "レビュー中",
-  Done: "完了",
-};
-
-export const PRIORITY_LABELS: Record<IssuePriority, string> = {
-  Highest: "最高",
-  High: "高",
-  Medium: "中",
-  Low: "低",
-  Lowest: "最低",
-};
-
-export const TYPE_LABELS: Record<IssueType, string> = {
-  Story: "ストーリー",
-  Bug: "バグ",
-  Task: "タスク",
-  Epic: "エピック",
-};
-
-export const CATEGORY_LABELS: Record<string, string> = {
-  Software: "ソフトウェア",
-  Business: "ビジネス",
-};
-
-// Default configs
-export const WORKFLOW_TRANSITIONS: Record<string, string[]> = {
-  "To Do": ["In Progress", "Done"],
-  "In Progress": ["To Do", "In Review", "Done"],
-  "In Review": ["In Progress", "Done"],
-  Done: ["In Progress", "To Do"],
-};
-
-export const DEFAULT_NOTIFICATION_SCHEME: Record<string, string[]> = {
-  issue_created: ["Reporter", "Assignee", "Watcher"],
-  issue_updated: ["Assignee", "Watcher"],
-  issue_assigned: ["Assignee"],
-  comment_added: ["Reporter", "Assignee", "Watcher"],
-  issue_resolved: ["Reporter", "Watcher"],
-};
 
 export const getCurrentUserId = () =>
   localStorage.getItem("currentUserId") || "";
@@ -96,29 +65,7 @@ class JiraCloneDB extends Dexie {
 
 export const db = new JiraCloneDB();
 
-const SEED_USERS: (User & { email?: string })[] = [
-  {
-    id: "u1",
-    name: "Alice Engineer",
-    email: "alice@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-  },
-  {
-    id: "u2",
-    name: "Bob Manager",
-    email: "bob@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=150",
-  },
-  {
-    id: "u3",
-    name: "Charlie Designer",
-    email: "charlie@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-  },
-];
+const SEED_USERS: (User & { email?: string })[] = getSeedUsers();
 
 export const USERS = SEED_USERS;
 
@@ -151,162 +98,29 @@ export const seedDatabase = async () => {
 
       await db.users.bulkAdd(SEED_USERS);
 
-      const projectId = "p-demo";
-      await db.projects.add({
-        id: projectId,
-        key: "DEMO",
-        name: "Jira Mobile Clone Dev",
-        description: "このアプリ自体の開発プロジェクトを模したデモデータです。",
-        leadId: "u1",
-        category: "Software",
-        type: "Scrum",
-        iconUrl: "🚀",
-        starred: true,
-        workflowSettings: WORKFLOW_TRANSITIONS,
-        notificationSettings: DEFAULT_NOTIFICATION_SCHEME,
-      });
+      const seedProjects = getSeedProjects();
+      const [seedProject] = seedProjects;
+      if (!seedProject) return;
+      await db.projects.add(seedProject);
 
-      const sprint1 = "s-1";
-      await db.sprints.add({
-        id: sprint1,
-        name: "Sprint 1",
-        projectId,
-        status: "active",
-      });
-      await db.sprints.add({
-        id: "s-backlog",
-        name: "バックログ",
-        projectId,
-        status: "future",
-      });
+      const seedSprints = getSeedSprints(seedProject.id);
+      await db.sprints.bulkAdd(seedSprints);
 
-      const now = new Date().toISOString();
-      const yesterday = new Date(Date.now() - 86400000).toISOString();
+      const nowIso = new Date().toISOString();
+      const yesterdayIso = new Date(Date.now() - 86400000).toISOString();
 
-      const issues: Issue[] = [
-        {
-          id: "i-1",
-          key: "DEMO-1",
-          projectId,
-          title: "ログイン画面の実装",
-          type: "Story",
-          status: "Done",
-          priority: "High",
-          assigneeId: "u1",
-          reporterId: "u2",
-          sprintId: sprint1,
-          labels: ["frontend"],
-          createdAt: yesterday,
-          updatedAt: now,
-          storyPoints: 5,
-          watcherIds: ["u1"],
-          comments: [],
-          workLogs: [],
-          history: [],
-          links: [],
-          attachments: [],
-        },
-        {
-          id: "i-2",
-          key: "DEMO-2",
-          projectId,
-          title: "APIのCORSエラー修正",
-          type: "Bug",
-          status: "In Progress",
-          priority: "Highest",
-          assigneeId: "u1",
-          reporterId: "u1",
-          sprintId: sprint1,
-          labels: ["backend", "bug"],
-          createdAt: now,
-          updatedAt: now,
-          storyPoints: 3,
-          watcherIds: ["u1", "u2"],
-          comments: [],
-          workLogs: [],
-          history: [],
-          links: [],
-          attachments: [],
-        },
-        {
-          id: "i-3",
-          key: "DEMO-3",
-          projectId,
-          title: "ダッシュボードのデザイン",
-          type: "Task",
-          status: "To Do",
-          priority: "Medium",
-          assigneeId: "u3",
-          reporterId: "u1",
-          sprintId: sprint1,
-          labels: ["design"],
-          createdAt: now,
-          updatedAt: now,
-          storyPoints: 2,
-          watcherIds: [],
-          comments: [],
-          workLogs: [],
-          history: [],
-          links: [],
-          attachments: [],
-        },
-        {
-          id: "i-4",
-          key: "DEMO-4",
-          projectId,
-          title: "ユーザー通知機能",
-          type: "Story",
-          status: "To Do",
-          priority: "High",
-          assigneeId: "u1",
-          reporterId: "u2",
-          sprintId: sprint1,
-          labels: ["feature"],
-          createdAt: now,
-          updatedAt: now,
-          storyPoints: 8,
-          watcherIds: [],
-          comments: [],
-          workLogs: [],
-          history: [],
-          links: [],
-          attachments: [],
-        },
-        {
-          id: "i-5",
-          key: "DEMO-5",
-          projectId,
-          title: "リリースマニュアルの作成",
-          type: "Task",
-          status: "To Do",
-          priority: "Low",
-          assigneeId: undefined,
-          reporterId: "u1",
-          sprintId: "s-backlog",
-          labels: ["docs"],
-          createdAt: now,
-          updatedAt: now,
-          storyPoints: 1,
-          watcherIds: [],
-          comments: [],
-          workLogs: [],
-          history: [],
-          links: [],
-          attachments: [],
-        },
-      ];
+      const issues = getSeedIssues({
+        projectId: seedProject.id,
+        sprintId: seedSprints[0]?.id || "s-1",
+        backlogSprintId: seedSprints[1]?.id || "s-backlog",
+        nowIso,
+        yesterdayIso,
+      });
 
       await db.issues.bulkAdd(issues);
 
-      await db.notifications.add({
-        id: "n-1",
-        title: "DEMO-2に割り当てられました",
-        description: "APIのCORSエラー修正",
-        read: false,
-        createdAt: now,
-        type: "assignment",
-        issueId: "i-2",
-      });
+      const notifications = getSeedNotifications(nowIso);
+      await db.notifications.bulkAdd(notifications);
     },
   );
 };
@@ -508,17 +322,8 @@ export const markAllNotificationsRead = async () => {
   return db.notifications.toCollection().modify({ read: true });
 };
 
-const evaluateCondition = (condition: string, issue: Issue): boolean => {
-  if (!condition) return true;
-  const parts = condition.split(" ");
-  if (parts.length === 3) {
-    const [field, op, value] = parts;
-    const actual = (issue as any)[field];
-    if (op === "=") return String(actual) === value;
-    if (op === "!=") return String(actual) !== value;
-  }
-  return true;
-};
+const evaluateCondition = (condition: string, issue: Issue): boolean =>
+  evaluateAutomationCondition(condition, issue);
 
 export const runAutomation = async (trigger: string, issue: Issue) => {
   const rules = await db.automationRules
@@ -585,7 +390,7 @@ export const createAutomationRule = async (rule: Partial<AutomationRule>) => {
 
 export const getAutomationLogs = async (ruleId: string) => {
   const logs = await db.automationLogs.where("ruleId").equals(ruleId).toArray();
-  return logs.sort((a, b) => b.executedAt.localeCompare(a.executedAt));
+  return sortAutomationLogsByExecutedAt(logs);
 };
 
 export const getIssueById = async (id: string) => {
@@ -866,18 +671,12 @@ export const getRecentIssues = async () => {
     .equals(curUser)
     .toArray();
 
-  const recentHistory = history
-    .sort((a, b) => b.viewedAt.localeCompare(a.viewedAt))
-    .slice(0, 10);
-
-  const issueIds = recentHistory.map((h) => h.issueId);
+  const issueIds = [...new Set(history.map((h) => h.issueId))];
   if (issueIds.length === 0) return [];
 
   const issues = await db.issues.where("id").anyOf(issueIds).toArray();
 
-  return issueIds
-    .map((id) => issues.find((i) => i.id === id))
-    .filter(Boolean) as Issue[];
+  return selectRecentIssues(history, issues);
 };
 
 export const getSprints = async (projectId: string) => {
@@ -933,22 +732,6 @@ export const saveFilter = async (name: string, query: string) => {
   return newFilter;
 };
 
-export const executeJQL = (jql: string, issues: Issue[]): Issue[] => {
-  try {
-    const parts = jql.split(/ AND /i);
-    return issues.filter((issue) => {
-      return parts.every((part) => {
-        const match = part.match(/(\w+)\s*=\s*['"]?([^'"]+)['"]?/);
-        if (!match) return true;
-        const [_, field, val] = match;
-        return String((issue as any)[field]) === val;
-      });
-    });
-  } catch (e) {
-    return issues;
-  }
-};
-
 export const setupInitialProject = async (
   name: string,
   key: string,
@@ -961,19 +744,5 @@ export const setupInitialProject = async (
 
 export const getProjectStats = async (pid: string) => {
   const issues = await db.issues.where("projectId").equals(pid).toArray();
-  const workload = SEED_USERS.map((u) => ({
-    userName: u.name,
-    count: issues.filter((i) => i.assigneeId === u.id).length,
-  }));
-
-  const epics = issues.filter((i) => i.type === "Epic");
-  const epicProgress = epics.map((epic) => {
-    const children = issues.filter((i) => i.parentId === epic.id);
-    const doneCount = children.filter((i) => i.status === "Done").length;
-    const percent =
-      children.length > 0 ? Math.round((doneCount / children.length) * 100) : 0;
-    return { id: epic.id, title: epic.title, percent };
-  });
-
-  return { workload, epicProgress };
+  return buildProjectStats(issues, SEED_USERS);
 };

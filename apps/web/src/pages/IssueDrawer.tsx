@@ -33,14 +33,13 @@ import {
 } from "lucide-react";
 import { IssueTypeIcon } from "../components/Common/IssueTypeIcon";
 import { Avatar } from "../components/Common/Avatar";
+import { STATUS_LABELS, WORKFLOW_TRANSITIONS } from "@repo/core";
 import {
   updateIssue,
   deleteIssue,
   USERS,
-  STATUS_LABELS,
   addComment,
   db,
-  WORKFLOW_TRANSITIONS,
   getSubtasks,
   addIssueLink,
   getCurrentUserId,
