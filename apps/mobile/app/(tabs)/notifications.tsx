@@ -14,19 +14,23 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     if (!ready) return;
+    let active = true;
     const load = async () => {
       const data = await getNotifications();
+      if (!active) return;
       setNotifications(data);
+      await markAllNotificationsRead();
+      if (!active) return;
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.read ? notification : { ...notification, read: true },
+        ),
+      );
     };
     void load();
-  }, [ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    const markRead = async () => {
-      await markAllNotificationsRead();
+    return () => {
+      active = false;
     };
-    void markRead();
   }, [ready]);
 
   return (
