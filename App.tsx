@@ -15,6 +15,7 @@ import { Welcome } from './pages/Welcome';
 import { IssueDrawer } from './pages/IssueDrawer';
 import { SetupWizard } from './components/Modals/SetupWizard';
 import { CreateIssueModal } from './components/Modals/CreateIssueModal';
+import { ConfirmProvider } from './providers/ConfirmProvider';
 import { Issue, IssueStatus } from './types';
 import { Menu, Plus, Search as SearchIcon } from 'lucide-react';
 
@@ -69,13 +70,20 @@ const AppContent = () => {
   const [createStatus, setCreateStatus] = useState<IssueStatus | undefined>(undefined);
   const [createProjectId, setCreateProjectId] = useState<string | undefined>(undefined);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we need to show setup wizard (only when logged in and on home/protected routes)
+    // Check if we need to show setup wizard
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     const hasSetup = localStorage.getItem('hasSetup') === 'true';
-    if (isLoggedIn && !hasSetup && location.pathname !== '/welcome' && location.pathname !== '/login') {
+    const isAuthPage = location.pathname === '/welcome' || location.pathname === '/login';
+    
+    // Logic: If logged in, setup not done, and not on auth pages -> Show Setup
+    // Crucially, if conditions are NOT met, hide it.
+    if (isLoggedIn && !hasSetup && !isAuthPage) {
       setShowSetup(true);
+    } else {
+      setShowSetup(false);
     }
   }, [location.pathname]);
 
@@ -88,6 +96,7 @@ const AppContent = () => {
   const handleSetupComplete = () => {
     localStorage.setItem('hasSetup', 'true');
     setShowSetup(false);
+    navigate('/'); // Ensure we are on home
   };
 
   return (
@@ -143,7 +152,9 @@ const AppContent = () => {
 export default function App() {
   return (
     <Router>
-      <AppContent />
+      <ConfirmProvider>
+        <AppContent />
+      </ConfirmProvider>
     </Router>
   );
 }

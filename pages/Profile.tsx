@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, updateUser, getUserStats, getCurrentUserId, clearDatabase } from '../services/mockData';
-import { LogOut, Bell, HelpCircle, ChevronRight, Save, Edit2, Languages, Camera, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { getCurrentUser, updateUser, getUserStats, getCurrentUserId } from '../services/mockData';
+import { resetApp } from '../services/appReset';
+import { useConfirm } from '../providers/ConfirmProvider';
+import { LogOut, Bell, HelpCircle, ChevronRight, Save, Edit2, Languages, Camera, RefreshCcw } from 'lucide-react';
 
 const MenuItem = ({ 
   icon: Icon, 
@@ -19,30 +20,37 @@ const MenuItem = ({
   toggle?: boolean, 
   active?: boolean, 
   onClick?: () => void 
-}) => (
-  <button 
-    type="button"
-    onClick={onClick}
-    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-100 last:border-0"
-  >
-    <div className="flex items-center gap-3">
-      <Icon size={20} className={danger ? "text-red-500" : "text-gray-500"} />
-      <span className={`text-sm font-medium ${danger ? "text-red-600" : "text-gray-700"}`}>{label}</span>
-    </div>
-    {toggle ? (
-      <div className={`w-10 h-6 rounded-full transition-colors relative ${active ? 'bg-primary' : 'bg-gray-200'}`}>
-        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${active ? 'left-5' : 'left-1'}`} />
+}) => {
+  return (
+    <button 
+      type="button"
+      onClick={(e) => {
+        if (onClick) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-100 last:border-0 cursor-pointer"
+    >
+      <div className="flex items-center gap-3">
+        <Icon size={20} className={danger ? "text-red-500" : "text-gray-500"} />
+        <span className={`text-sm font-medium ${danger ? "text-red-600" : "text-gray-700"}`}>{label}</span>
       </div>
-    ) : (
-      <ChevronRight size={16} className="text-gray-400" />
-    )}
-  </button>
-);
+      {toggle ? (
+        <div className={`w-10 h-6 rounded-full transition-colors relative ${active ? 'bg-primary' : 'bg-gray-200'}`}>
+          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${active ? 'left-5' : 'left-1'}`} />
+        </div>
+      ) : (
+        <ChevronRight size={16} className="text-gray-400" />
+      )}
+    </button>
+  );
+};
 
 export const Profile = () => {
   const user = useLiveQuery(() => getCurrentUser());
   const stats = useLiveQuery(() => getUserStats(getCurrentUserId()));
-  const navigate = useNavigate();
+  const { confirm } = useConfirm();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -65,23 +73,35 @@ export const Profile = () => {
     setIsEditing(false);
   };
 
-  const handleLogout = () => {
-    if (window.confirm('ログアウトしてもよろしいですか？')) {
+  const handleLogout = async () => {
+    const isConfirmed = await confirm({
+      title: 'ログアウト',
+      message: 'ログアウトしてもよろしいですか？\n次回利用時は再ログインが必要です。',
+      confirmText: 'ログアウト',
+      isDestructive: true
+    });
+
+    if (isConfirmed) {
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUserId');
-      navigate('/login');
+      window.location.reload();
     }
   };
 
   const handleResetApp = async () => {
-    if (window.confirm('【重要】アプリを初期化しますか？\nすべてのプロジェクト、課題、設定が完全に削除されます。この操作は取り消せません。')) {
-      try {
-        await clearDatabase();
-        localStorage.clear();
-        navigate('/welcome');
-      } catch (e) {
-        console.error("Reset failed", e);
-        alert("初期化中にエラーが発生しました。");
+    const isConfirmed = await confirm({
+      title: 'アプリの初期化',
+      message: '【重要】すべてのプロジェクト、課題、設定が完全に削除されます。\nこの操作は取り消せません。本当によろしいですか？',
+      confirmText: '初期化する',
+      isDestructive: true
+    });
+
+    if (isConfirmed) {
+      const success = await resetApp();
+      if (success) {
+        window.location.reload();
+      } else {
+        alert('初期化中にエラーが発生しました。');
       }
     }
   };
@@ -189,7 +209,7 @@ export const Profile = () => {
       </div>
       
       <p className="text-center text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] mt-12 pb-12">
-        JiraMobile Clone v1.2.0
+        JiraMobile Clone v1.2.1 (Fixes Applied)
       </p>
     </div>
   );
