@@ -2,6 +2,7 @@ import React from 'react';
 import { Project, Issue } from '../../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { STATUS_LABELS } from '../../services/mockData';
 
 interface Props {
   project: Project;
@@ -15,10 +16,10 @@ export const ProjectSummary: React.FC<Props> = ({ project, issues }) => {
   }, {} as Record<string, number>);
 
   const data = [
-    { name: 'To Do', count: statusCounts['To Do'] || 0, color: '#DFE1E6' },
-    { name: 'In Progress', count: statusCounts['In Progress'] || 0, color: '#0052CC' },
-    { name: 'In Review', count: statusCounts['In Review'] || 0, color: '#00B8D9' },
-    { name: 'Done', count: statusCounts['Done'] || 0, color: '#36B37E' },
+    { name: STATUS_LABELS['To Do'], count: statusCounts['To Do'] || 0, color: '#DFE1E6' },
+    { name: STATUS_LABELS['In Progress'], count: statusCounts['In Progress'] || 0, color: '#0052CC' },
+    { name: STATUS_LABELS['In Review'], count: statusCounts['In Review'] || 0, color: '#00B8D9' },
+    { name: STATUS_LABELS['Done'], count: statusCounts['Done'] || 0, color: '#36B37E' },
   ];
 
   const recentActivity = issues
@@ -32,7 +33,7 @@ export const ProjectSummary: React.FC<Props> = ({ project, issues }) => {
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-gray-500 mb-2">
             <AlertCircle size={16} />
-            <span className="text-xs font-semibold uppercase">Open Issues</span>
+            <span className="text-xs font-semibold uppercase">未完了の課題</span>
           </div>
           <p className="text-2xl font-bold text-gray-800">
             {issues.filter(i => i.status !== 'Done').length}
@@ -41,7 +42,7 @@ export const ProjectSummary: React.FC<Props> = ({ project, issues }) => {
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-green-600 mb-2">
             <CheckCircle size={16} />
-            <span className="text-xs font-semibold uppercase">Completed</span>
+            <span className="text-xs font-semibold uppercase">完了済み</span>
           </div>
           <p className="text-2xl font-bold text-gray-800">
             {issues.filter(i => i.status === 'Done').length}
@@ -51,7 +52,7 @@ export const ProjectSummary: React.FC<Props> = ({ project, issues }) => {
 
       {/* Chart */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">Status Overview</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">ステータス概要</h3>
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
@@ -71,7 +72,7 @@ export const ProjectSummary: React.FC<Props> = ({ project, issues }) => {
       <div>
         <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
           <Clock size={16} />
-          Recent Activity
+          最近のアクティビティ
         </h3>
         <div className="space-y-3">
           {recentActivity.map(issue => (
@@ -79,7 +80,7 @@ export const ProjectSummary: React.FC<Props> = ({ project, issues }) => {
               <span className={`w-2 h-2 rounded-full ${issue.status === 'Done' ? 'bg-green-500' : 'bg-blue-500'}`} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{issue.title}</p>
-                <p className="text-xs text-gray-500">Updated {new Date(issue.updatedAt).toLocaleDateString()}</p>
+                <p className="text-xs text-gray-500">{new Date(issue.updatedAt).toLocaleDateString()} に更新</p>
               </div>
               <span className="text-xs font-mono text-gray-400">{issue.key}</span>
             </div>

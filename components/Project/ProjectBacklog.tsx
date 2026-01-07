@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Issue, Sprint } from '../../types';
+import { Issue, Sprint, Project } from '../../types';
 import { IssueTypeIcon } from '../Common/IssueTypeIcon';
 import { PriorityIcon } from '../Common/PriorityIcon';
 import { Avatar } from '../Common/Avatar';
-import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from 'lucide-react';
+import { STATUS_LABELS, createSprint } from '../../services/mockData';
 
 interface Props {
+  project: Project;
   issues: Issue[];
   sprints: Sprint[];
   onIssueClick: (issue: Issue) => void;
@@ -35,7 +37,7 @@ const SprintSection: React.FC<SprintSectionProps> = ({ sprint, issues, onIssueCl
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs bg-gray-200 px-2 py-1 rounded-full font-mono text-gray-600">
-             {issues.length} issues
+             {issues.length} 件
           </span>
           <MoreHorizontal size={16} className="text-gray-400" />
         </div>
@@ -45,7 +47,7 @@ const SprintSection: React.FC<SprintSectionProps> = ({ sprint, issues, onIssueCl
         <div className="bg-white border-x border-b border-gray-200 rounded-b-lg divide-y divide-gray-100">
           {issues.length === 0 ? (
             <div className="p-8 text-center text-gray-400 text-sm border-dashed border-2 border-gray-100 m-2 rounded">
-              No issues in this sprint. Plan something!
+              このスプリントには課題がありません。計画しましょう！
             </div>
           ) : (
             issues.map(issue => (
@@ -66,7 +68,7 @@ const SprintSection: React.FC<SprintSectionProps> = ({ sprint, issues, onIssueCl
                 <div className="flex items-center gap-3 shrink-0">
                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium hidden sm:inline-block
                       ${issue.status === 'Done' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                      {issue.status}
+                      {STATUS_LABELS[issue.status]}
                    </span>
                    {issue.storyPoints !== undefined && (
                      <span className="text-xs bg-gray-100 text-gray-600 w-6 h-6 flex items-center justify-center rounded-full font-semibold">
@@ -85,13 +87,30 @@ const SprintSection: React.FC<SprintSectionProps> = ({ sprint, issues, onIssueCl
   );
 };
 
-export const ProjectBacklog: React.FC<Props> = ({ issues, sprints, onIssueClick }) => {
+export const ProjectBacklog: React.FC<Props> = ({ project, issues, sprints, onIssueClick }) => {
+  // Force update to reflect new sprints (simple mock behavior)
+  const [_, setForceUpdate] = useState(0);
+  
   const activeSprints = sprints.filter(s => s.status === 'active');
-  const futureSprints = sprints.filter(s => s.status === 'future' && !s.name.includes('Backlog'));
-  const backlogContainer = sprints.find(s => s.name.includes('Backlog')) || { id: 'backlog', name: 'Backlog', status: 'future' } as Sprint;
+  const futureSprints = sprints.filter(s => s.status === 'future' && !s.name.includes('バックログ') && !s.name.includes('Backlog'));
+  const backlogContainer = sprints.find(s => s.name.includes('バックログ') || s.name.includes('Backlog')) || { id: 'backlog', name: 'バックログ', status: 'future' } as Sprint;
+
+  const handleCreateSprint = () => {
+    createSprint(project.id);
+    setForceUpdate(prev => prev + 1); // Trigger re-render to show new sprint
+  };
 
   return (
     <div className="p-4 pb-24 max-w-4xl mx-auto">
+      <div className="flex justify-end mb-4">
+        <button 
+          onClick={handleCreateSprint}
+          className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1"
+        >
+          <Plus size={16} /> スプリントを作成
+        </button>
+      </div>
+
       {activeSprints.map(sprint => (
         <SprintSection 
             key={sprint.id} 

@@ -26,6 +26,7 @@ export interface Issue {
   assigneeId?: string;
   reporterId: string;
   sprintId?: string;
+  fixVersionId?: string; // Added for Releases
   description?: string;
   dueDate?: string;
   storyPoints?: number;
@@ -57,6 +58,15 @@ export interface Sprint {
   status: 'active' | 'future' | 'completed';
 }
 
+export interface Version {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  releaseDate?: string;
+  status: 'released' | 'unreleased' | 'archived';
+}
+
 export interface Notification {
   id: string;
   title: string;
@@ -64,4 +74,5 @@ export interface Notification {
   read: boolean;
   createdAt: string;
   type: 'mention' | 'assignment' | 'system';
+  issueId?: string; // Link to issue
 }

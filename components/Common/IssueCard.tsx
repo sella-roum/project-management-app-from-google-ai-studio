@@ -3,6 +3,7 @@ import { Issue } from '../../types';
 import { IssueTypeIcon } from './IssueTypeIcon';
 import { PriorityIcon } from './PriorityIcon';
 import { Avatar } from './Avatar';
+import { STATUS_LABELS } from '../../services/mockData';
 
 interface Props {
   issue: Issue;
@@ -40,7 +41,7 @@ export const IssueCard: React.FC<Props> = ({ issue, onClick, compact }) => {
             ${issue.status === 'Done' ? 'bg-green-100 text-green-800' : 
               issue.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 
               'bg-gray-100 text-gray-700'}`}>
-            {issue.status}
+            {STATUS_LABELS[issue.status]}
         </span>}
       </div>
     </div>

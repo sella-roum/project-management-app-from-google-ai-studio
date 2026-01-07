@@ -1,5 +1,5 @@
 {
-  "name": "JiraMobile Clone",
-  "description": "A mobile-first project management application inspired by Jira, featuring Kanban boards, Scrum backlogs, Timelines, and comprehensive issue tracking.",
+  "name": "JiraMobile Clone (JP)",
+  "description": "Jiraにインスパイアされたモバイルファーストのプロジェクト管理アプリ。カンバンボード、スクラムバックログ、タイムライン、包括的な課題追跡機能を備えています。",
   "requestFramePermissions": []
 }

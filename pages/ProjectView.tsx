@@ -1,41 +1,53 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { getProjectById, getIssues, getSprints } from '../services/mockData';
 import { ProjectSummary } from '../components/Project/ProjectSummary';
 import { ProjectBoard } from '../components/Project/ProjectBoard';
 import { ProjectBacklog } from '../components/Project/ProjectBacklog';
 import { ProjectTimeline } from '../components/Project/ProjectTimeline';
-import { LayoutDashboard, Kanban, ListTodo, CalendarClock, Settings } from 'lucide-react';
-import { Issue } from '../types';
+import { ProjectReleases } from '../components/Project/ProjectReleases';
+import { ProjectSettings } from '../components/Project/ProjectSettings';
+import { LayoutDashboard, Kanban, ListTodo, CalendarClock, Settings, Rocket } from 'lucide-react';
+import { Issue, IssueStatus } from '../types';
 
-type Tab = 'summary' | 'board' | 'backlog' | 'timeline' | 'settings';
+type Tab = 'summary' | 'board' | 'backlog' | 'timeline' | 'releases' | 'settings';
 
-export const ProjectView = ({ onOpenIssue }: { onOpenIssue: (i: Issue) => void }) => {
+// Helper to access the global context provided by App
+interface GlobalContext {
+  onOpenIssue: (i: Issue) => void;
+  openCreateModal: (status?: IssueStatus, projectId?: string) => void;
+}
+
+export const ProjectView = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('summary');
+  const { onOpenIssue, openCreateModal } = useOutletContext<GlobalContext>();
 
   const project = getProjectById(projectId || '');
-  if (!project) return <div className="p-8 text-center">Project not found</div>;
+  if (!project) return <div className="p-8 text-center">プロジェクトが見つかりません</div>;
 
   const issues = getIssues(project.id);
   const sprints = getSprints(project.id);
 
-  // Filter issues for Board: Only active sprint or items on the board
-  // In a real app, this logic is complex (board query). Here, we just show all non-done, or everything.
-  // For standard Agile: Board usually shows active sprints.
-  // For Kanban: Shows everything.
   const boardIssues = project.type === 'Scrum' 
     ? issues.filter(i => sprints.find(s => s.id === i.sprintId)?.status === 'active')
     : issues;
 
+  // Wrapper to inject projectId
+  const handleCreateIssue = (status?: IssueStatus) => {
+    openCreateModal(status, project.id);
+  };
+
   const renderTab = () => {
     switch(activeTab) {
       case 'summary': return <ProjectSummary project={project} issues={issues} />;
-      case 'board': return <ProjectBoard issues={boardIssues} onIssueClick={onOpenIssue} />;
-      case 'backlog': return <ProjectBacklog issues={issues} sprints={sprints} onIssueClick={onOpenIssue} />;
+      case 'board': return <ProjectBoard issues={boardIssues} onIssueClick={onOpenIssue} onCreateIssue={handleCreateIssue} />;
+      case 'backlog': return <ProjectBacklog project={project} issues={issues} sprints={sprints} onIssueClick={onOpenIssue} />;
       case 'timeline': return <ProjectTimeline issues={issues} />;
-      default: return <div className="p-4">Settings Placeholder</div>;
+      case 'releases': return <ProjectReleases project={project} issues={issues} />;
+      case 'settings': return <ProjectSettings project={project} />;
+      default: return null;
     }
   };
 
@@ -63,21 +75,23 @@ export const ProjectView = ({ onOpenIssue }: { onOpenIssue: (i: Issue) => void }
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900 leading-tight">{project.name}</h1>
-            <p className="text-xs text-gray-500">{project.type} Project</p>
+            <p className="text-xs text-gray-500">{project.type} プロジェクト</p>
           </div>
         </div>
 
         {/* Scrollable Tabs */}
         <div className="flex overflow-x-auto no-scrollbar gap-2 -mb-[1px]">
-          <TabButton id="summary" icon={LayoutDashboard} label="Summary" />
-          <TabButton id="board" icon={Kanban} label="Board" />
-          {project.type === 'Scrum' && <TabButton id="backlog" icon={ListTodo} label="Backlog" />}
-          <TabButton id="timeline" icon={CalendarClock} label="Timeline" />
+          <TabButton id="summary" icon={LayoutDashboard} label="サマリー" />
+          <TabButton id="board" icon={Kanban} label="ボード" />
+          {project.type === 'Scrum' && <TabButton id="backlog" icon={ListTodo} label="バックログ" />}
+          <TabButton id="timeline" icon={CalendarClock} label="タイムライン" />
+          <TabButton id="releases" icon={Rocket} label="リリース" />
+          <TabButton id="settings" icon={Settings} label="設定" />
         </div>
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden bg-bgLight">
+      <div className="flex-1 overflow-hidden bg-bgLight overflow-y-auto no-scrollbar">
          {renderTab()}
       </div>
     </div>
