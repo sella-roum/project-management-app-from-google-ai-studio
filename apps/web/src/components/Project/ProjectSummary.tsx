@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { AlertCircle, CheckCircle, Clock, Users, Zap } from "lucide-react";
 import { STATUS_LABELS } from "@repo/core";
-import { getProjectStats } from "../../services/mockData";
+import { getProjectStats } from "@repo/storage";
 import { useLiveQuery } from "dexie-react-hooks";
 
 interface Props {

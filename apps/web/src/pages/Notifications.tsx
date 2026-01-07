@@ -4,7 +4,7 @@ import {
   markAllNotificationsRead,
   getIssueById,
   markNotificationRead,
-} from "../services/mockData";
+} from "@repo/storage";
 import { Bell, MessageSquare, UserPlus } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { Issue } from "../types";

@@ -6,7 +6,7 @@ import {
   toggleAutomationRule,
   createAutomationRule,
   getAutomationLogs,
-} from "../../services/mockData";
+} from "@repo/storage";
 import {
   Zap,
   PlayCircle,

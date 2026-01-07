@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { STATUS_LABELS } from "@repo/core";
-import { db, getCurrentUserId } from "../services/mockData";
+import { getCurrentUserId, getIssues, getProjects } from "@repo/storage";
 import {
   PieChart,
   Pie,
@@ -40,8 +40,8 @@ const AVAILABLE_GADGETS: Gadget[] = [
 ];
 
 export const Dashboards = () => {
-  const issues = useLiveQuery(() => db.issues.toArray()) || [];
-  const projects = useLiveQuery(() => db.projects.toArray()) || [];
+  const issues = useLiveQuery(() => getIssues()) || [];
+  const projects = useLiveQuery(() => getProjects()) || [];
   const [activeGadgetIds, setActiveGadgetIds] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);

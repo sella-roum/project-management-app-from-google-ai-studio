@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { CATEGORY_LABELS } from "@repo/core";
-import { getProjects, toggleProjectStar } from "../services/mockData";
+import { getProjects, toggleProjectStar } from "@repo/storage";
 import { useNavigate } from "react-router-dom";
 import { Star, MoreHorizontal } from "lucide-react";
 import { CreateProjectModal } from "../components/Modals/CreateProjectModal";

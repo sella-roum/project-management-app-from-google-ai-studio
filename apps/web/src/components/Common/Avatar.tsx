@@ -1,6 +1,6 @@
 import React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../../services/mockData";
+import { getUserById } from "@repo/storage";
 
 interface AvatarProps {
   userId?: string;
@@ -34,7 +34,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   showName = false,
 }) => {
   const user = useLiveQuery(
-    () => (userId ? db.users.get(userId) : undefined),
+    () => (userId ? getUserById(userId) : undefined),
     [userId],
   );
 

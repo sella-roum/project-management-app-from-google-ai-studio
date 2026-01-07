@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X, Rocket, Layout, ListTodo, ChevronRight } from "lucide-react";
-import { setupInitialProject } from "../../services/mockData";
+import { setupInitialProject } from "@repo/storage";
 
 export const SetupWizard = ({ onComplete }: { onComplete: () => void }) => {
   const [step, setStep] = useState(1);

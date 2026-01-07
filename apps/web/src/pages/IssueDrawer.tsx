@@ -39,7 +39,8 @@ import {
   deleteIssue,
   USERS,
   addComment,
-  db,
+  getIssueById,
+  getIssues,
   getSubtasks,
   addIssueLink,
   getCurrentUserId,
@@ -50,7 +51,7 @@ import {
   addAttachment,
   hasPermission,
   getVersions,
-} from "../services/mockData";
+} from "@repo/storage";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useConfirm } from "../providers/ConfirmProvider";
 
@@ -87,12 +88,12 @@ export const IssueDrawer: React.FC<Props> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const issue = useLiveQuery(
-    () => (initialIssue ? db.issues.get(initialIssue.id) : undefined),
+    () => (initialIssue ? getIssueById(initialIssue.id) : undefined),
     [initialIssue?.id],
   );
   const subtasks =
     useLiveQuery(() => (issue ? getSubtasks(issue.id) : []), [issue?.id]) || [];
-  const allIssues = useLiveQuery(() => db.issues.toArray(), []) || [];
+  const allIssues = useLiveQuery(() => getIssues(), []) || [];
   const projectVersions =
     useLiveQuery(
       () => (issue ? getVersions(issue.projectId) : []),

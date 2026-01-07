@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Project, Issue } from "../../types";
-import { getVersions, createVersion } from "../../services/mockData";
+import { getVersions, createVersion } from "@repo/storage";
 import { Truck, CheckCircle, Calendar, Plus, X } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 

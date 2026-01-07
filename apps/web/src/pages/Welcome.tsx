@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { seedDatabase, clearDatabase } from "../services/mockData";
+import { seedDatabase, clearDatabase } from "@repo/storage";
 import { Rocket, Trash2, Check, ArrowRight } from "lucide-react";
 
 export const Welcome = () => {
