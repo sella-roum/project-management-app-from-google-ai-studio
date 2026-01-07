@@ -1,35 +1,42 @@
 
+
 import { db } from './mockData';
 
-export const resetApp = async () => {
+export const resetApp = async (): Promise<boolean> => {
   try {
-    // 1. Explicitly close the connection first to avoid 'DatabaseClosedError' in active queries
-    db.close();
+    // Attempt to delete DB first
+    try {
+      db.close();
+      await db.delete();
+    } catch (dbError) {
+      console.warn("DB deletion failed, attempting to clear tables instead:", dbError);
+      // Fallback: Re-open and clear
+      if (!db.isOpen()) await db.open();
+      await db.transaction('rw', db.tables, async () => {
+        await Promise.all(db.tables.map(table => table.clear()));
+      });
+    }
     
-    // 2. Delete the database
-    await db.delete();
-    
-    // 3. Clear application keys from localStorage
+    // Clear storage
     const keysToRemove = [
       'isLoggedIn', 
       'currentUserId', 
       'hasSetup', 
-      'appInitialized'
+      'appInitialized',
+      'notificationsEnabled'
     ];
-    keysToRemove.forEach(key => localStorage.removeItem(key));
+    // Also clear dashboard gadgets patterns
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('dashboard_gadgets_')) keysToRemove.push(key);
+    });
     
-    // NOTE: Do NOT call db.open() here. 
-    // The app should reload immediately after this function returns.
-    // Opening it here might cause race conditions with the dying React tree.
+    keysToRemove.forEach(key => localStorage.removeItem(key));
     
     return true;
   } catch (error) {
     console.error('Failed to reset app:', error);
-    
-    // Fallback: Clear storage anyway so at least the login state is reset
-    const keysToRemove = ['isLoggedIn', 'currentUserId', 'hasSetup', 'appInitialized'];
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    
-    return true; // Return true to trigger reload in the UI
+    // Force clear critical keys anyway
+    ['isLoggedIn', 'currentUserId'].forEach(k => localStorage.removeItem(k));
+    return false;
   }
 };

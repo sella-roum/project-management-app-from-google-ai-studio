@@ -38,6 +38,19 @@ export const ProjectSettings: React.FC<Props> = ({ project }) => {
     }
   };
 
+  const handleSaveWorkflow = async (newWorkflow: Record<string, string[]>) => {
+    await updateProject(project.id, { workflowSettings: newWorkflow });
+    setShowWorkflowEditor(false);
+  };
+
+  const handleSaveNotification = async (newScheme: Record<string, string[]>) => {
+    await updateProject(project.id, { notificationSettings: newScheme });
+    setShowNotifEditor(false);
+  };
+
+  // Use project specific or default if missing (though mockData now ensures it)
+  const currentWorkflow = project.workflowSettings || WORKFLOW_TRANSITIONS;
+
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto space-y-6">
       <div className="flex gap-4 border-b border-gray-200">
@@ -127,17 +140,17 @@ export const ProjectSettings: React.FC<Props> = ({ project }) => {
         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4 animate-fadeIn">
           <h3 className="text-sm font-bold text-gray-800">ステータスマッピング</h3>
           <div className="space-y-4">
-            {Object.entries(WORKFLOW_TRANSITIONS).map(([status, nextStatuses]) => (
+            {Object.entries(currentWorkflow).map(([status, nextStatuses]) => (
               <div key={status} className="flex gap-4 items-center">
-                 <div className="w-32 p-2 bg-gray-50 border border-gray-200 rounded text-xs font-bold text-center">{STATUS_LABELS[status as any]}</div>
+                 <div className="w-32 p-2 bg-gray-50 border border-gray-200 rounded text-xs font-bold text-center">{STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status}</div>
                  <div className="text-gray-400">→</div>
                  <div className="flex-1 flex flex-wrap gap-2">
-                    {/* Fix: Cast nextStatuses to any[] to ensure .map is available */}
-                    {(nextStatuses as any[]).map(ns => (
+                    {(nextStatuses as string[]).map(ns => (
                       <span key={ns} className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[10px] font-bold">
-                        {STATUS_LABELS[ns as any]}
+                        {STATUS_LABELS[ns as keyof typeof STATUS_LABELS] || ns}
                       </span>
                     ))}
+                    {(!nextStatuses || nextStatuses.length === 0) && <span className="text-xs text-gray-400 italic">遷移なし</span>}
                  </div>
               </div>
             ))}
@@ -171,6 +184,9 @@ export const ProjectSettings: React.FC<Props> = ({ project }) => {
                  ))}
               </tbody>
            </table>
+           <div className="p-4 bg-gray-50 text-center text-xs text-gray-400 font-bold border-t border-gray-200">
+             権限設定は現在読み取り専用です
+           </div>
         </div>
       )}
       
@@ -182,25 +198,46 @@ export const ProjectSettings: React.FC<Props> = ({ project }) => {
            </div>
            <div className="space-y-4">
               {[
-                {e: '課題が作成されたとき', r: '報告者、担当者、ウォッチャー'},
-                {e: '課題が更新されたとき', r: '担当者、ウォッチャー'},
-                {e: 'コメントが投稿されたとき', r: 'すべての関与ユーザー'}
-              ].map((row, i) => (
-                <div key={i} className="flex justify-between items-center py-2 border-b border-gray-50">
-                   <div>
-                      <div className="font-bold text-gray-800 text-sm">{row.e}</div>
-                      <div className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">{row.r}</div>
-                   </div>
-                   <button onClick={() => setShowNotifEditor(true)} className="text-[10px] font-bold text-primary">編集</button>
-                </div>
-              ))}
+                {event: 'issue_created', label: '課題の作成'},
+                {event: 'issue_updated', label: '課題の更新'},
+                {event: 'issue_assigned', label: '課題の割り当て'},
+                {event: 'comment_added', label: 'コメント投稿'},
+                {event: 'issue_resolved', label: '課題の解決'},
+              ].map((row, i) => {
+                 const recipients = project.notificationSettings?.[row.event] || [];
+                 return (
+                  <div key={i} className="flex justify-between items-center py-2 border-b border-gray-50">
+                     <div>
+                        <div className="font-bold text-gray-800 text-sm">{row.label}</div>
+                     </div>
+                     <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
+                        {recipients.length > 0 ? recipients.map(r => (
+                          <span key={r} className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{r}</span>
+                        )) : <span className="text-[10px] text-gray-300">なし</span>}
+                     </div>
+                  </div>
+                 )
+              })}
+           </div>
+           <div className="pt-4 mt-4 border-t border-gray-100 flex justify-end">
+              <button onClick={() => setShowNotifEditor(true)} className="text-xs font-bold text-primary hover:underline">エディタで通知を編集</button>
            </div>
         </div>
       )}
 
       {/* Modals */}
-      <WorkflowEditorModal isOpen={showWorkflowEditor} onClose={() => setShowWorkflowEditor(false)} onSave={() => setShowWorkflowEditor(false)} />
-      <NotificationSchemeModal isOpen={showNotifEditor} onClose={() => setShowNotifEditor(false)} onSave={() => setShowNotifEditor(false)} />
+      <WorkflowEditorModal 
+         isOpen={showWorkflowEditor} 
+         currentWorkflow={project.workflowSettings || WORKFLOW_TRANSITIONS}
+         onClose={() => setShowWorkflowEditor(false)} 
+         onSave={handleSaveWorkflow} 
+      />
+      <NotificationSchemeModal 
+         isOpen={showNotifEditor} 
+         currentScheme={project.notificationSettings || {}}
+         onClose={() => setShowNotifEditor(false)} 
+         onSave={handleSaveNotification} 
+      />
     </div>
   );
 };

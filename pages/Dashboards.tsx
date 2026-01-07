@@ -1,13 +1,13 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, STATUS_LABELS } from '../services/mockData';
+import { db, STATUS_LABELS, getCurrentUserId } from '../services/mockData';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Layout, LayoutDashboard, Bug, CheckCircle, Clock, Plus, X, List } from 'lucide-react';
 
 const COLORS = ['#0052CC', '#36B37E', '#FFAB00', '#FF5630', '#00B8D9'];
 
-// Defined interface to ensure proper type inference for gadgets
 interface Gadget {
   id: string;
   title: string;
@@ -24,8 +24,28 @@ const AVAILABLE_GADGETS: Gadget[] = [
 export const Dashboards = () => {
   const issues = useLiveQuery(() => db.issues.toArray()) || [];
   const projects = useLiveQuery(() => db.projects.toArray()) || [];
-  const [activeGadgetIds, setActiveGadgetIds] = useState<string[]>(['status', 'progress', 'bugs']);
+  const [activeGadgetIds, setActiveGadgetIds] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Load configuration
+  useEffect(() => {
+    const userId = getCurrentUserId();
+    const stored = localStorage.getItem(`dashboard_gadgets_${userId}`);
+    if (stored) {
+      setActiveGadgetIds(JSON.parse(stored));
+    } else {
+      setActiveGadgetIds(['status', 'progress', 'bugs']);
+    }
+    setIsInitialized(true);
+  }, []);
+
+  // Save configuration
+  useEffect(() => {
+    if (!isInitialized) return;
+    const userId = getCurrentUserId();
+    localStorage.setItem(`dashboard_gadgets_${userId}`, JSON.stringify(activeGadgetIds));
+  }, [activeGadgetIds, isInitialized]);
 
   const statusData = Object.entries(
     issues.reduce((acc, i) => {
@@ -51,7 +71,6 @@ export const Dashboards = () => {
     setShowAddModal(false);
   };
 
-  // Fixed: Use React.FC to correctly handle standard React props like 'key' in JSX
   const GadgetWrapper: React.FC<{ id: string; title: string; icon: any; children?: React.ReactNode }> = ({ id, title, icon: Icon, children }) => (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
@@ -68,6 +87,8 @@ export const Dashboards = () => {
       </div>
     </div>
   );
+
+  if (!isInitialized) return null;
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 pb-24">

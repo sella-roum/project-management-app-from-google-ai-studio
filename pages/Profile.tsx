@@ -71,7 +71,7 @@ export const Profile = () => {
     }
     // Load notification setting
     const storedNotif = localStorage.getItem('notificationsEnabled');
-    setNotificationsEnabled(storedNotif === 'true');
+    setNotificationsEnabled(storedNotif !== 'false'); // Default true
   }, [user]);
 
   const toggleNotifications = () => {
@@ -81,10 +81,9 @@ export const Profile = () => {
   };
 
   const handleLanguageChange = async () => {
-    // Mock language change for now
     const confirmed = await confirm({
-      title: '言語の変更',
-      message: '現在は日本語のみサポートされています。',
+      title: '言語設定',
+      message: '現在は日本語のみサポートされています。他の言語は将来のアップデートで追加される予定です。',
       confirmText: 'OK',
       cancelText: '閉じる'
     });
@@ -108,6 +107,7 @@ export const Profile = () => {
       setIsProcessing(true); 
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUserId');
+      window.location.href = '#/login';
       window.location.reload();
     }
   };
@@ -124,6 +124,7 @@ export const Profile = () => {
       setIsProcessing(true);
       const success = await resetApp();
       if (success) {
+        window.location.href = '#/welcome';
         window.location.reload();
       } else {
         setIsProcessing(false);
@@ -245,7 +246,7 @@ export const Profile = () => {
       </div>
       
       <p className="text-center text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] mt-12 pb-12">
-        JiraMobile Clone v1.3.0
+        JiraMobile Clone v1.3.1
       </p>
     </div>
   );

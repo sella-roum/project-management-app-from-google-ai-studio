@@ -80,6 +80,9 @@ export interface Project {
   type: 'Scrum' | 'Kanban';
   columnSettings?: Record<IssueStatus, { limit?: number }>;
   starred?: boolean;
+  // New settings
+  workflowSettings?: Record<string, string[]>; // Status -> Allowed Next Statuses
+  notificationSettings?: Record<string, string[]>; // Event -> Recipients (e.g. ['Assignee', 'Reporter'])
 }
 
 export interface AutomationRule {
@@ -94,9 +97,6 @@ export interface AutomationRule {
   lastRun?: string;
 }
 
-/**
- * Added missing AutomationLog interface
- */
 export interface AutomationLog {
   id: string;
   ruleId: string;

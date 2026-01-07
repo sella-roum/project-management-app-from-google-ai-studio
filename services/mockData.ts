@@ -30,11 +30,20 @@ export const CATEGORY_LABELS: Record<string, string> = {
   'Business': 'ビジネス'
 };
 
+// Default configs
 export const WORKFLOW_TRANSITIONS: Record<string, string[]> = {
   'To Do': ['In Progress', 'Done'],
   'In Progress': ['To Do', 'In Review', 'Done'],
   'In Review': ['In Progress', 'Done'],
   'Done': ['In Progress', 'To Do']
+};
+
+export const DEFAULT_NOTIFICATION_SCHEME: Record<string, string[]> = {
+  'issue_created': ['Reporter', 'Assignee', 'Watcher'],
+  'issue_updated': ['Assignee', 'Watcher'],
+  'issue_assigned': ['Assignee'],
+  'comment_added': ['Reporter', 'Assignee', 'Watcher'],
+  'issue_resolved': ['Reporter', 'Watcher']
 };
 
 export const getCurrentUserId = () => localStorage.getItem('currentUserId') || '';
@@ -53,7 +62,7 @@ class JiraCloneDB extends Dexie {
 
   constructor() {
     super('JiraCloneDB');
-    this.version(8).stores({
+    this.version(9).stores({
       users: 'id, &email',
       projects: 'id, key, type, leadId',
       issues: 'id, key, projectId, sprintId, assigneeId, reporterId, parentId, status, type',
@@ -103,7 +112,9 @@ export const seedDatabase = async () => {
       category: 'Software',
       type: 'Scrum',
       iconUrl: '🚀',
-      starred: true
+      starred: true,
+      workflowSettings: WORKFLOW_TRANSITIONS,
+      notificationSettings: DEFAULT_NOTIFICATION_SCHEME
     });
 
     const sprint1 = 's-1';
@@ -227,6 +238,8 @@ export const createProject = async (project: Partial<Project>) => {
     category: 'Software',
     type: 'Kanban',
     starred: false,
+    workflowSettings: WORKFLOW_TRANSITIONS,
+    notificationSettings: DEFAULT_NOTIFICATION_SCHEME,
     ...project
   } as Project;
   await db.projects.add(newProject);
@@ -250,9 +263,43 @@ export const toggleProjectStar = async (projectId: string) => {
 
 export const hasPermission = (userId: string, action: string, project?: Project) => {
   if (userId === 'u1') return true;
-  // In demo mode, we allow all users to delete issues
   if (action === 'manage_project') return userId === 'u2'; 
   return true; 
+};
+
+// Internal helper for dispatching notifications based on scheme
+const dispatchProjectNotification = async (projectId: string, event: string, issue: Issue, context?: any) => {
+  const project = await db.projects.get(projectId);
+  const scheme = project?.notificationSettings || DEFAULT_NOTIFICATION_SCHEME;
+  const recipients = scheme[event] || [];
+  const curUser = getCurrentUserId();
+  
+  const targetUserIds = new Set<string>();
+
+  if (recipients.includes('Reporter') && issue.reporterId) targetUserIds.add(issue.reporterId);
+  if (recipients.includes('Assignee') && issue.assigneeId) targetUserIds.add(issue.assigneeId);
+  if (recipients.includes('Watcher')) (issue.watcherIds || []).forEach(id => targetUserIds.add(id));
+  
+  // Don't notify self
+  if (targetUserIds.has(curUser)) targetUserIds.delete(curUser);
+
+  let title = '通知';
+  let description = issue.title;
+
+  if (event === 'issue_created') title = `新しい課題が作成されました: ${issue.key}`;
+  if (event === 'issue_assigned') title = `課題があなたに割り当てられました: ${issue.key}`;
+  if (event === 'status_changed') title = `課題のステータスが「${STATUS_LABELS[issue.status as IssueStatus]}」に変更されました`;
+  if (event === 'comment_added') title = `新しいコメントが追加されました: ${issue.key}`;
+  if (event === 'issue_resolved') title = `課題が解決されました: ${issue.key}`;
+
+  for (const userId of targetUserIds) {
+    await createNotification({
+      title,
+      description,
+      type: event === 'comment_added' ? 'mention' : 'system',
+      issueId: issue.id
+    });
+  }
 };
 
 const createNotification = async (notif: Partial<Notification>) => {
@@ -272,7 +319,6 @@ export const getNotifications = async () => {
 };
 
 export const getUnreadMentionCount = async () => {
-  // Use filter because boolean fields in IndexedDB can sometimes be tricky with exact matches
   return db.notifications.filter(n => !n.read).count();
 };
 
@@ -409,13 +455,10 @@ export const createIssue = async (issue: Partial<Issue>) => {
   
   await db.issues.add(newIssue);
   
+  // Dynamic Notifications
+  await dispatchProjectNotification(newIssue.projectId, 'issue_created', newIssue);
   if (newIssue.assigneeId && newIssue.assigneeId !== curUser) {
-    await createNotification({
-      title: '新しい課題が割り当てられました',
-      description: `${newIssue.key}: ${newIssue.title}`,
-      type: 'assignment',
-      issueId: newIssue.id
-    });
+    await dispatchProjectNotification(newIssue.projectId, 'issue_assigned', newIssue);
   }
 
   await runAutomation('issue_created', newIssue);
@@ -426,6 +469,22 @@ export const updateIssue = async (id: string, updates: Partial<Issue>) => {
   const old = await db.issues.get(id);
   if (!old) return;
   const curUser = getCurrentUserId();
+  const project = await db.projects.get(old.projectId);
+
+  // Workflow Validation
+  if (updates.status && updates.status !== old.status) {
+    const workflow = project?.workflowSettings || WORKFLOW_TRANSITIONS;
+    const allowed = workflow[old.status] || [];
+    // Allow if it's the same status (redundant check but safe) or if in allowed transitions
+    // Bypass for 'u1' (admin-ish) could be added here, but prompt asks for enforcement.
+    // If empty list, assume any transition allowed (fallback)? No, assume strict.
+    // If key missing in workflow, assume standard transitions.
+    if (!allowed.includes(updates.status)) {
+       // We'll return false here to indicate failure to the UI
+       // UI should ideally handle this rejection
+       return false;
+    }
+  }
 
   const historyEntries: any[] = [];
   const changes: any = { ...updates, updatedAt: new Date().toISOString() };
@@ -441,25 +500,16 @@ export const updateIssue = async (id: string, updates: Partial<Issue>) => {
         createdAt: new Date().toISOString()
       });
 
+      // Dynamic Notifications
       if (key === 'assigneeId' && value && value !== curUser) {
-        await createNotification({
-          title: '課題があなたに割り当てられました',
-          description: `${old.key}: ${old.title}`,
-          type: 'assignment',
-          issueId: old.id
-        });
+        await dispatchProjectNotification(old.projectId, 'issue_assigned', old);
       }
 
       if (key === 'status') {
-        const watchers = old.watcherIds || [];
-        for (const watcherId of watchers.filter(wid => wid !== curUser)) {
-          await createNotification({
-            title: `課題のステータスが「${STATUS_LABELS[value as IssueStatus]}」に変更されました`,
-            description: old.key,
-            type: 'system',
-            issueId: old.id
-          });
-        }
+        const event = value === 'Done' ? 'issue_resolved' : 'status_changed';
+        // Mock updated issue object for notification context
+        const updatedObj = { ...old, status: value as IssueStatus };
+        await dispatchProjectNotification(old.projectId, event, updatedObj as Issue);
       }
     }
   }
@@ -475,7 +525,13 @@ export const updateIssue = async (id: string, updates: Partial<Issue>) => {
 };
 
 export const updateIssueStatus = async (id: string, status: IssueStatus) => {
-  return updateIssue(id, { status });
+  const result = await updateIssue(id, { status });
+  if (result === false) {
+    // Ideally we throw or toast, but for this mock implementation we'll alert window
+    alert(`ステータス遷移が許可されていません: ${status}`);
+    return undefined;
+  }
+  return result;
 };
 
 export const deleteIssue = async (id: string) => {
@@ -523,15 +579,8 @@ export const addComment = async (id: string, text: string) => {
     }];
     await db.issues.update(id, { comments, updatedAt: new Date().toISOString() });
     
-    const watchers = issue.watcherIds || [];
-    for (const watcherId of watchers.filter(wid => wid !== curUser)) {
-      await createNotification({
-        title: '新しいコメントが追加されました',
-        description: `${issue.key}: ${text.substring(0, 30)}...`,
-        type: 'mention',
-        issueId: issue.id
-      });
-    }
+    // Dynamic Notifications
+    await dispatchProjectNotification(issue.projectId, 'comment_added', issue);
 
     await runAutomation('comment_added', issue);
   }
