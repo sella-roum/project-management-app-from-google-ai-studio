@@ -1,17 +1,27 @@
 import * as SQLite from "expo-sqlite";
 
 import type {
+  AutomationLog,
+  AutomationRule,
   Issue,
+  IssueStatus,
+  LinkType,
   Notification,
   Project,
+  SavedFilter,
   Sprint,
+  User,
+  Version,
+  WorkLog,
 } from "@repo/core";
 import {
+  buildProjectStats,
   DEFAULT_NOTIFICATION_SCHEME,
   getSeedIssues,
   getSeedNotifications,
   getSeedProjects,
   getSeedSprints,
+  getSeedUsers,
   WORKFLOW_TRANSITIONS,
 } from "@repo/core";
 import type {
@@ -30,14 +40,17 @@ type SQLiteRow = {
   id: string;
   data: string;
   projectId?: string;
+  email?: string;
   read?: number;
 };
 
 const noopUnsubscribe: Unsubscribe = () => undefined;
+const SEED_USERS: User[] = getSeedUsers();
 
 export class SQLiteStorageAdapter implements AppStorage {
   private dbPromise: Promise<SQLite.SQLiteDatabase>;
   private ready: Promise<void>;
+  private currentUserId = "u1";
   settings: SettingsStore;
   projects: ProjectsRepo;
   issues: IssuesRepo;
@@ -56,38 +69,38 @@ export class SQLiteStorageAdapter implements AppStorage {
     this.ready = this.initialize();
 
     this.projects = {
-      list: () => this.listProjects(),
-      get: (id) => this.getProjectById(id),
-      create: (input) => this.createProject(input),
-      update: (id, patch) => this.updateProject(id, patch),
-      toggleStar: (id) => this.toggleProjectStar(id),
-      remove: (id) => this.removeProject(id),
+      list: () => this.listProjectsInternal(),
+      get: (id) => this.getProjectByIdInternal(id),
+      create: (input) => this.createProjectInternal(input),
+      update: (id, patch) => this.updateProjectInternal(id, patch),
+      toggleStar: (id) => this.toggleProjectStarInternal(id),
+      remove: (id) => this.removeProjectInternal(id),
       watchAll: (listener) => this.watchProjects(listener),
       watchById: (id, listener) => this.watchProject(id, listener),
     };
 
     this.issues = {
-      listByProject: (projectId) => this.listIssues(projectId),
-      create: (input) => this.createIssue(input),
-      update: (id, patch) => this.updateIssue(id, patch),
-      updateStatus: (id, status) => this.updateIssue(id, { status }),
-      remove: (id) => this.removeIssue(id),
+      listByProject: (projectId) => this.listIssuesInternal(projectId),
+      create: (input) => this.createIssueInternal(input),
+      update: (id, patch) => this.updateIssueInternal(id, patch),
+      updateStatus: (id, status) => this.updateIssueInternal(id, { status }),
+      remove: (id) => this.removeIssueInternal(id),
       watchAll: (listener) => this.watchIssues(listener),
       watchById: (id, listener) => this.watchIssue(id, listener),
     };
 
     this.sprints = {
-      listByProject: (projectId) => this.listSprints(projectId),
-      create: (input) => this.createSprint(input),
-      start: (id) => this.updateSprint(id, { status: "active" }),
-      complete: (id) => this.updateSprint(id, { status: "completed" }),
+      listByProject: (projectId) => this.listSprintsInternal(projectId),
+      create: (input) => this.createSprintInternal(input),
+      start: (id) => this.updateSprintInternal(id, { status: "active" }),
+      complete: (id) => this.updateSprintInternal(id, { status: "completed" }),
       watchAll: (listener) => this.watchSprints(listener),
       watchById: (id, listener) => this.watchSprint(id, listener),
     };
 
     this.notifications = {
-      markRead: (id) => this.markNotificationRead(id),
-      markAllRead: () => this.markAllNotificationsRead(),
+      markRead: (id) => this.markNotificationReadInternal(id),
+      markAllRead: () => this.markAllNotificationsReadInternal(),
       watchAll: (listener) => this.watchNotifications(listener),
       watchById: (id, listener) => this.watchNotification(id, listener),
     };
@@ -97,6 +110,12 @@ export class SQLiteStorageAdapter implements AppStorage {
     const db = await this.dbPromise;
     await db.execAsync(`
       PRAGMA journal_mode = WAL;
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY NOT NULL,
+        email TEXT,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS users_email ON users (email);
       CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY NOT NULL,
         data TEXT NOT NULL
@@ -119,6 +138,12 @@ export class SQLiteStorageAdapter implements AppStorage {
         data TEXT NOT NULL
       );
     `);
+    const storedUserId = await this.settings.get("currentUserId");
+    if (storedUserId) {
+      this.currentUserId = storedUserId;
+    } else {
+      await this.settings.set("currentUserId", this.currentUserId);
+    }
   }
 
   private async getDb(): Promise<SQLite.SQLiteDatabase> {
@@ -129,6 +154,28 @@ export class SQLiteStorageAdapter implements AppStorage {
   private parseRow<T>(row?: SQLiteRow | null): T | null {
     if (!row) return null;
     return JSON.parse(row.data) as T;
+  }
+
+  private async upsertUser(user: User): Promise<void> {
+    const db = await this.getDb();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO users (id, email, data) VALUES (?, ?, ?)",
+      [user.id, user.email ?? null, JSON.stringify(user)],
+    );
+  }
+
+  private async getUserByEmail(email: string): Promise<User | null> {
+    const db = await this.getDb();
+    const row = await db.getFirstAsync<SQLiteRow>(
+      "SELECT data FROM users WHERE email = ?",
+      [email],
+    );
+    return this.parseRow<User>(row);
+  }
+
+  private async setCurrentUserId(id: string): Promise<void> {
+    this.currentUserId = id;
+    await this.settings.set("currentUserId", id);
   }
 
   private async queryAll<T>(
@@ -167,13 +214,13 @@ export class SQLiteStorageAdapter implements AppStorage {
     return noopUnsubscribe;
   }
 
-  private listProjects = async (): Promise<Project[]> =>
+  private listProjectsInternal = async (): Promise<Project[]> =>
     this.queryAll<Project>("SELECT data FROM projects");
 
-  private getProjectById = async (id: ID): Promise<Project | null> =>
+  private getProjectByIdInternal = async (id: ID): Promise<Project | null> =>
     this.queryFirst<Project>("SELECT data FROM projects WHERE id = ?", [id]);
 
-  private createProject = async (
+  private createProjectInternal = async (
     input: Omit<Project, "id"> & { id?: ID },
   ): Promise<Project> => {
     const id = input.id ?? `p-${Date.now()}`;
@@ -195,11 +242,11 @@ export class SQLiteStorageAdapter implements AppStorage {
     return project;
   };
 
-  private updateProject = async (
+  private updateProjectInternal = async (
     id: ID,
     patch: Partial<Project>,
   ): Promise<Project> => {
-    const existing = await this.getProjectById(id);
+    const existing = await this.getProjectByIdInternal(id);
     if (!existing) {
       throw new Error(`Project not found: ${id}`);
     }
@@ -212,13 +259,13 @@ export class SQLiteStorageAdapter implements AppStorage {
     return updated;
   };
 
-  private toggleProjectStar = async (id: ID): Promise<void> => {
-    const project = await this.getProjectById(id);
+  private toggleProjectStarInternal = async (id: ID): Promise<void> => {
+    const project = await this.getProjectByIdInternal(id);
     if (!project) return;
-    await this.updateProject(id, { starred: !project.starred });
+    await this.updateProjectInternal(id, { starred: !project.starred });
   };
 
-  private removeProject = async (id: ID): Promise<void> => {
+  private removeProjectInternal = async (id: ID): Promise<void> => {
     const db = await this.getDb();
     await db.runAsync("DELETE FROM projects WHERE id = ?", [id]);
     await db.runAsync("DELETE FROM issues WHERE projectId = ?", [id]);
@@ -226,23 +273,23 @@ export class SQLiteStorageAdapter implements AppStorage {
   };
 
   private watchProjects = (listener: (rows: Project[]) => void) =>
-    this.watchAll(() => this.listProjects(), listener);
+    this.watchAll(() => this.listProjectsInternal(), listener);
 
   private watchProject = (id: ID, listener: (row: Project | null) => void) =>
-    this.watchById(() => this.getProjectById(id), listener);
+    this.watchById(() => this.getProjectByIdInternal(id), listener);
 
-  private listIssues = async (projectId: ID): Promise<Issue[]> =>
+  private listIssuesInternal = async (projectId: ID): Promise<Issue[]> =>
     this.queryAll<Issue>("SELECT data FROM issues WHERE projectId = ?", [
       projectId,
     ]);
 
-  private getIssueById = async (id: ID): Promise<Issue | null> =>
+  private getIssueByIdInternal = async (id: ID): Promise<Issue | null> =>
     this.queryFirst<Issue>("SELECT data FROM issues WHERE id = ?", [id]);
 
-  private createIssue = async (
+  private createIssueInternal = async (
     input: Partial<Issue> & { projectId: ID; title: string },
   ): Promise<Issue> => {
-    const project = await this.getProjectById(input.projectId);
+    const project = await this.getProjectByIdInternal(input.projectId);
     const db = await this.getDb();
     const countRow = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM issues WHERE projectId = ?",
@@ -278,11 +325,11 @@ export class SQLiteStorageAdapter implements AppStorage {
     return issue;
   };
 
-  private updateIssue = async (
+  private updateIssueInternal = async (
     id: ID,
     patch: Partial<Issue>,
   ): Promise<Issue> => {
-    const existing = await this.getIssueById(id);
+    const existing = await this.getIssueByIdInternal(id);
     if (!existing) {
       throw new Error(`Issue not found: ${id}`);
     }
@@ -295,7 +342,7 @@ export class SQLiteStorageAdapter implements AppStorage {
     return updated;
   };
 
-  private removeIssue = async (id: ID): Promise<void> => {
+  private removeIssueInternal = async (id: ID): Promise<void> => {
     const db = await this.getDb();
     await db.runAsync("DELETE FROM issues WHERE id = ?", [id]);
   };
@@ -304,17 +351,17 @@ export class SQLiteStorageAdapter implements AppStorage {
     this.watchAll(() => this.queryAll<Issue>("SELECT data FROM issues"), listener);
 
   private watchIssue = (id: ID, listener: (row: Issue | null) => void) =>
-    this.watchById(() => this.getIssueById(id), listener);
+    this.watchById(() => this.getIssueByIdInternal(id), listener);
 
-  private listSprints = async (projectId: ID): Promise<Sprint[]> =>
+  private listSprintsInternal = async (projectId: ID): Promise<Sprint[]> =>
     this.queryAll<Sprint>("SELECT data FROM sprints WHERE projectId = ?", [
       projectId,
     ]);
 
-  private getSprintById = async (id: ID): Promise<Sprint | null> =>
+  private getSprintByIdInternal = async (id: ID): Promise<Sprint | null> =>
     this.queryFirst<Sprint>("SELECT data FROM sprints WHERE id = ?", [id]);
 
-  private createSprint = async (
+  private createSprintInternal = async (
     input: Partial<Sprint> & { projectId: ID; name: string },
   ): Promise<Sprint> => {
     const sprint: Sprint = {
@@ -334,11 +381,11 @@ export class SQLiteStorageAdapter implements AppStorage {
     return sprint;
   };
 
-  private updateSprint = async (
+  private updateSprintInternal = async (
     id: ID,
     patch: Partial<Sprint>,
   ): Promise<Sprint> => {
-    const existing = await this.getSprintById(id);
+    const existing = await this.getSprintByIdInternal(id);
     if (!existing) {
       throw new Error(`Sprint not found: ${id}`);
     }
@@ -358,19 +405,21 @@ export class SQLiteStorageAdapter implements AppStorage {
     );
 
   private watchSprint = (id: ID, listener: (row: Sprint | null) => void) =>
-    this.watchById(() => this.getSprintById(id), listener);
+    this.watchById(() => this.getSprintByIdInternal(id), listener);
 
-  private listNotifications = async (): Promise<Notification[]> =>
+  private listNotificationsInternal = async (): Promise<Notification[]> =>
     this.queryAll<Notification>("SELECT data FROM notifications");
 
-  private getNotificationById = async (id: ID): Promise<Notification | null> =>
+  private getNotificationByIdInternal = async (
+    id: ID,
+  ): Promise<Notification | null> =>
     this.queryFirst<Notification>(
       "SELECT data FROM notifications WHERE id = ?",
       [id],
     );
 
-  private markNotificationRead = async (id: ID): Promise<void> => {
-    const notification = await this.getNotificationById(id);
+  private markNotificationReadInternal = async (id: ID): Promise<void> => {
+    const notification = await this.getNotificationByIdInternal(id);
     if (!notification) return;
     const db = await this.getDb();
     await db.runAsync(
@@ -379,8 +428,8 @@ export class SQLiteStorageAdapter implements AppStorage {
     );
   };
 
-  private markAllNotificationsRead = async (): Promise<void> => {
-    const notifications = await this.listNotifications();
+  private markAllNotificationsReadInternal = async (): Promise<void> => {
+    const notifications = await this.listNotificationsInternal();
     const db = await this.getDb();
     await db.execAsync("UPDATE notifications SET read = 1");
     await Promise.all(
@@ -394,30 +443,340 @@ export class SQLiteStorageAdapter implements AppStorage {
   };
 
   private watchNotifications = (listener: (rows: Notification[]) => void) =>
-    this.watchAll(() => this.listNotifications(), listener);
+    this.watchAll(() => this.listNotificationsInternal(), listener);
 
   private watchNotification = (
     id: ID,
     listener: (row: Notification | null) => void,
-  ) => this.watchById(() => this.getNotificationById(id), listener);
+  ) => this.watchById(() => this.getNotificationByIdInternal(id), listener);
 
-  seedDemo = async (): Promise<void> => {
+  getCurrentUserId = (): string => this.currentUserId;
+
+  clearDatabase = async (): Promise<void> => {
     const db = await this.getDb();
     await db.execAsync(`
       DELETE FROM notifications;
       DELETE FROM issues;
       DELETE FROM sprints;
       DELETE FROM projects;
+      DELETE FROM users;
     `);
+  };
+
+  checkIfDatabaseIsSeeded = async (): Promise<boolean> => {
+    const db = await this.getDb();
+    const row = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM users",
+    );
+    return (row?.count ?? 0) > 0;
+  };
+
+  loginAsUser = async (email: string): Promise<User | null> => {
+    const user = await this.getUserByEmail(email);
+    if (!user) return null;
+    await this.setCurrentUserId(user.id);
+    return user;
+  };
+
+  registerUser = async (email: string, name: string): Promise<User> => {
+    const newUser: User = {
+      id: `u-${Date.now()}`,
+      name,
+      email,
+      avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
+    };
+    await this.upsertUser(newUser);
+    await this.setCurrentUserId(newUser.id);
+    return newUser;
+  };
+
+  getUserById = async (id: string): Promise<User | null> =>
+    this.queryFirst<User>("SELECT data FROM users WHERE id = ?", [id]);
+
+  getCurrentUser = async (): Promise<User | null> => {
+    const id = this.getCurrentUserId();
+    if (!id) return null;
+    return this.getUserById(id);
+  };
+
+  updateUser = async (
+    id: string,
+    updates: Partial<User>,
+  ): Promise<User | null> => {
+    const existing = await this.getUserById(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    await this.upsertUser(updated);
+    return updated;
+  };
+
+  getUserStats = async (uid: string) => {
+    if (!uid) return { assigned: 0, reported: 0, leading: 0 };
+    const issues = await this.queryAll<Issue>("SELECT data FROM issues");
+    const projects = await this.listProjectsInternal();
+    const assignedRow = issues.filter((issue) => issue.assigneeId === uid);
+    const reportedRow = issues.filter((issue) => issue.reporterId === uid);
+    const leadingRow = projects.filter((project) => project.leadId === uid);
+    return {
+      assigned: assignedRow.length,
+      reported: reportedRow.length,
+      leading: leadingRow.length,
+    };
+  };
+
+  getProjects = async (): Promise<Project[]> => this.listProjectsInternal();
+
+  getProjectById = async (id: string): Promise<Project | null> =>
+    this.getProjectByIdInternal(id);
+
+  createProject = async (
+    project: Omit<Project, "id"> & { id?: ID },
+  ): Promise<Project> => this.createProjectInternal(project);
+
+  updateProject = async (
+    id: string,
+    updates: Partial<Project>,
+  ): Promise<Project> => this.updateProjectInternal(id, updates);
+
+  deleteProject = async (id: string): Promise<void> =>
+    this.removeProjectInternal(id);
+
+  hasPermission = (
+    _userId: string,
+    _action: string,
+    _project?: Project,
+  ): boolean => true;
+
+  getNotifications = async (): Promise<Notification[]> => {
+    const notifications = await this.listNotificationsInternal();
+    return notifications.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  };
+
+  getUnreadMentionCount = async (): Promise<number> => {
+    const notifications = await this.listNotificationsInternal();
+    return notifications.filter((n) => !n.read).length;
+  };
+
+  markNotificationRead = async (id: string): Promise<void> =>
+    this.markNotificationReadInternal(id);
+
+  markAllNotificationsRead = async (): Promise<void> =>
+    this.markAllNotificationsReadInternal();
+
+  getIssues = async (projectId?: string): Promise<Issue[]> => {
+    if (projectId) return this.listIssuesInternal(projectId);
+    return this.queryAll<Issue>("SELECT data FROM issues");
+  };
+
+  getIssueById = async (id: string): Promise<Issue | null> =>
+    this.getIssueByIdInternal(id);
+
+  createIssue = async (
+    issue: Partial<Issue> & { projectId: ID; title: string },
+  ): Promise<Issue> => this.createIssueInternal(issue);
+
+  updateIssue = async (
+    id: string,
+    updates: Partial<Issue>,
+  ): Promise<Issue> => this.updateIssueInternal(id, updates);
+
+  getIssuesForUser = async (userId: string): Promise<Issue[]> => {
+    const issues = await this.queryAll<Issue>("SELECT data FROM issues");
+    return issues.filter((issue) => issue.assigneeId === userId);
+  };
+
+  updateIssueStatus = async (id: string, status: IssueStatus) =>
+    this.updateIssueInternal(id, { status });
+
+  deleteIssue = async (id: string): Promise<void> =>
+    this.removeIssueInternal(id);
+
+  addAttachment = async (_issueId: string, _file: File): Promise<void> =>
+    undefined;
+
+  addComment = async (id: string, text: string) => {
+    const issue = await this.getIssueByIdInternal(id);
+    if (!issue) return;
+    const comments = [
+      ...(issue.comments ?? []),
+      {
+        id: `c-${Date.now()}`,
+        authorId: this.getCurrentUserId(),
+        content: text,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    await this.updateIssueInternal(id, { comments });
+  };
+
+  addIssueLink = async (
+    _issueId: string,
+    _targetId: string,
+    _type: LinkType,
+  ) => undefined;
+
+  getSubtasks = async (_parentId: string): Promise<Issue[]> => [];
+
+  logWork = async (
+    issueId: string,
+    seconds: number,
+    comment?: string,
+  ): Promise<void> => {
+    const issue = await this.getIssueByIdInternal(issueId);
+    if (!issue) return;
+    const newLog: WorkLog = {
+      id: `wl-${Date.now()}`,
+      authorId: this.getCurrentUserId(),
+      timeSpentSeconds: seconds,
+      comment,
+      createdAt: new Date().toISOString(),
+    };
+    const workLogs = [...(issue.workLogs ?? []), newLog];
+    await this.updateIssueInternal(issueId, { workLogs });
+  };
+
+  toggleWatch = async (issueId: string): Promise<void> => {
+    const issue = await this.getIssueByIdInternal(issueId);
+    if (!issue) return;
+    const currentUserId = this.getCurrentUserId();
+    const watcherIds = issue.watcherIds ?? [];
+    const index = watcherIds.indexOf(currentUserId);
+    if (index >= 0) {
+      watcherIds.splice(index, 1);
+    } else {
+      watcherIds.push(currentUserId);
+    }
+    await this.updateIssueInternal(issueId, { watcherIds });
+  };
+
+  recordView = async (_issueId: string): Promise<void> => undefined;
+
+  getRecentIssues = async (): Promise<Issue[]> => [];
+
+  getSprints = async (projectId: string): Promise<Sprint[]> =>
+    this.listSprintsInternal(projectId);
+
+  createSprint = async (projectId: string): Promise<Sprint> =>
+    this.createSprintInternal({ projectId, name: `Sprint ${Date.now()}` });
+
+  updateSprintStatus = async (
+    id: string,
+    status: "active" | "future" | "completed",
+  ): Promise<Sprint> => this.updateSprintInternal(id, { status });
+
+  getVersions = async (_projectId: string): Promise<Version[]> => [];
+
+  createVersion = async (version: Partial<Version>): Promise<Version> => ({
+    id: `v-${Date.now()}`,
+    status: "unreleased",
+    ...version,
+  });
+
+  updateVersion = async (
+    id: string,
+    patch: Partial<Version>,
+  ): Promise<Version> => ({
+    id,
+    status: patch.status ?? "unreleased",
+    ...patch,
+  });
+
+  deleteVersion = async (_id: string): Promise<void> => undefined;
+
+  getSavedFilters = async (_ownerId?: string): Promise<SavedFilter[]> => [];
+
+  saveFilter = async (
+    name: string,
+    query: string,
+    ownerId?: string,
+  ): Promise<SavedFilter> => ({
+    id: `f-${Date.now()}`,
+    name,
+    query,
+    ownerId: ownerId ?? this.getCurrentUserId(),
+    isFavorite: false,
+  });
+
+  updateSavedFilter = async (
+    id: string,
+    patch: Partial<SavedFilter>,
+  ): Promise<SavedFilter> => ({
+    id,
+    name: patch.name ?? "Saved filter",
+    query: patch.query ?? "",
+    ownerId: patch.ownerId ?? this.getCurrentUserId(),
+    isFavorite: patch.isFavorite ?? false,
+  });
+
+  deleteSavedFilter = async (_id: string): Promise<void> => undefined;
+
+  runAutomation = async (
+    _trigger: string,
+    _issue: Issue,
+  ): Promise<void> => undefined;
+
+  getAutomationRules = async (
+    _projectId: string,
+  ): Promise<AutomationRule[]> => [];
+
+  toggleAutomationRule = async (_id: string, _enabled: boolean) => undefined;
+
+  createAutomationRule = async (
+    rule: Partial<AutomationRule>,
+  ): Promise<AutomationRule> => ({
+    id: `ar-${Date.now()}`,
+    enabled: true,
+    name: rule.name ?? "Automation rule",
+    projectId: rule.projectId ?? "",
+    trigger: rule.trigger ?? "issue_created",
+    condition: rule.condition ?? {},
+    action: rule.action ?? "add_comment",
+  });
+
+  getAutomationLogs = async (_ruleId: string): Promise<AutomationLog[]> => [];
+
+  setupInitialProject = async (
+    name: string,
+    key: string,
+    type: "Scrum" | "Kanban",
+  ) => {
+    const project = await this.createProjectInternal({ name, key, type });
+    await this.settings.set("hasSetup", "true");
+    return project;
+  };
+
+  getProjectStats = async (pid: string) => {
+    const issues = await this.getIssues(pid);
+    return buildProjectStats(issues, SEED_USERS);
+  };
+
+  seedDemo = async (): Promise<void> => {
+    const db = await this.getDb();
+    await db.execAsync(`
+      DELETE FROM users;
+      DELETE FROM notifications;
+      DELETE FROM issues;
+      DELETE FROM sprints;
+      DELETE FROM projects;
+    `);
+
+    for (const user of SEED_USERS) {
+      await this.upsertUser(user);
+    }
+    if (SEED_USERS[0]) {
+      await this.setCurrentUserId(SEED_USERS[0].id);
+    }
 
     const seedProjects = getSeedProjects();
     const [seedProject] = seedProjects;
     if (!seedProject) return;
-    await this.createProject(seedProject);
+    await this.createProjectInternal(seedProject);
 
     const seedSprints = getSeedSprints(seedProject.id);
     for (const sprint of seedSprints) {
-      await this.createSprint(sprint);
+      await this.createSprintInternal(sprint);
     }
 
     const nowIso = new Date().toISOString();
@@ -430,7 +789,7 @@ export class SQLiteStorageAdapter implements AppStorage {
       yesterdayIso,
     });
     for (const issue of issues) {
-      await this.createIssue(issue);
+      await this.createIssueInternal(issue);
     }
 
     const notifications = getSeedNotifications(nowIso);
@@ -449,6 +808,7 @@ export class SQLiteStorageAdapter implements AppStorage {
   reset = async (): Promise<void> => {
     const db = await this.getDb();
     await db.execAsync(`
+      DELETE FROM users;
       DELETE FROM notifications;
       DELETE FROM issues;
       DELETE FROM sprints;
@@ -464,5 +824,6 @@ export class SQLiteStorageAdapter implements AppStorage {
     ];
     const dashboardKeys = await this.settings.keys("dashboard_gadgets_");
     await this.settings.multiRemove([...keysToRemove, ...dashboardKeys]);
+    this.currentUserId = "u1";
   };
 }

@@ -8,6 +8,10 @@
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
     "build": "npm --workspace apps/web run build",
-    "preview": "npm --workspace apps/web run preview"
+    "preview": "npm --workspace apps/web run preview",
+    "mobile:start": "npm --workspace apps/mobile run start",
+    "mobile:ios": "npm --workspace apps/mobile run ios",
+    "mobile:android": "npm --workspace apps/mobile run android",
+    "mobile:clear": "npm --workspace apps/mobile run start -- --clear"
   }
 }

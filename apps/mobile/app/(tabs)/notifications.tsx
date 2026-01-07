@@ -1,22 +1,76 @@
-import { StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { ScrollView, StyleSheet } from "react-native";
+
+import type { Notification } from "@repo/core";
+import { getNotifications, markAllNotificationsRead } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useStorageReady } from "@/hooks/use-storage";
 
 export default function NotificationsScreen() {
+  const ready = useStorageReady();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    if (!ready) return;
+    let active = true;
+    const load = async () => {
+      const data = await getNotifications();
+      if (!active) return;
+      setNotifications(data);
+      await markAllNotificationsRead();
+      if (!active) return;
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.read ? notification : { ...notification, read: true },
+        ),
+      );
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [ready]);
+
   return (
-    <ThemedView style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <ThemedText type="title">Notifications</ThemedText>
-      <ThemedText>Recent updates and mentions will appear here.</ThemedText>
-    </ThemedView>
+      {!ready ? (
+        <ThemedText>Loading notifications...</ThemedText>
+      ) : notifications.length === 0 ? (
+        <ThemedText>No notifications yet.</ThemedText>
+      ) : (
+        <ThemedView style={styles.list}>
+          {notifications.map((notification) => (
+            <ThemedView key={notification.id} style={styles.card}>
+              <ThemedText type="defaultSemiBold">
+                {notification.title}
+              </ThemedText>
+              <ThemedText>{notification.description}</ThemedText>
+              <ThemedText>
+                {notification.read ? "Read" : "Unread"} •{" "}
+                {new Date(notification.createdAt).toLocaleString()}
+              </ThemedText>
+            </ThemedView>
+          ))}
+        </ThemedView>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  card: {
+    borderRadius: 16,
+    gap: 6,
+    padding: 16,
+  },
   container: {
-    flex: 1,
     gap: 12,
-    justifyContent: "center",
-    paddingHorizontal: 24,
+    padding: 24,
+  },
+  list: {
+    gap: 12,
   },
 });
