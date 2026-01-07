@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, STATUS_LABELS, getCurrentUserId } from "../services/mockData";
+import { STATUS_LABELS } from "@repo/core";
+import { db, getCurrentUserId } from "../services/mockData";
 import {
   PieChart,
   Pie,

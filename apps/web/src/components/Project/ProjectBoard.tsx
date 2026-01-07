@@ -12,8 +12,8 @@ import {
   Clock,
   AlertTriangle,
 } from "lucide-react";
+import { STATUS_LABELS } from "@repo/core";
 import {
-  STATUS_LABELS,
   updateIssueStatus,
   USERS,
   getCurrentUserId,

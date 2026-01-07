@@ -3,7 +3,7 @@ import { Issue } from "../../types";
 import { IssueTypeIcon } from "./IssueTypeIcon";
 import { PriorityIcon } from "./PriorityIcon";
 import { Avatar } from "./Avatar";
-import { STATUS_LABELS } from "../../services/mockData";
+import { STATUS_LABELS } from "@repo/core";
 
 interface Props {
   issue: Issue;

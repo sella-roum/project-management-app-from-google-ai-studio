@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, ArrowRight, Plus, Trash2 } from "lucide-react";
-import { STATUS_LABELS } from "../../services/mockData";
+import { STATUS_LABELS } from "@repo/core";
 
 interface Props {
   isOpen: boolean;
