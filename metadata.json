@@ -1,0 +1,5 @@
+{
+  "name": "JiraMobile Clone",
+  "description": "A mobile-first project management application inspired by Jira, featuring Kanban boards, Scrum backlogs, Timelines, and comprehensive issue tracking.",
+  "requestFramePermissions": []
+}
