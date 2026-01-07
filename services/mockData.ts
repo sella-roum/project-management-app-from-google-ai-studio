@@ -36,7 +36,7 @@ export const WORKFLOW_TRANSITIONS: Record<string, string[]> = {
   'Done': ['In Progress', 'To Do']
 };
 
-export const getCurrentUserId = () => localStorage.getItem('currentUserId') || 'u1';
+export const getCurrentUserId = () => localStorage.getItem('currentUserId') || '';
 
 class JiraCloneDB extends Dexie {
   users!: Table<User>;
@@ -193,7 +193,9 @@ export const registerUser = async (email: string, name: string) => {
 };
 
 export const getCurrentUser = async () => {
-  return db.users.get(getCurrentUserId());
+  const id = getCurrentUserId();
+  if (!id) return undefined;
+  return db.users.get(id);
 };
 
 export const updateUser = async (id: string, updates: Partial<User>) => {
@@ -201,6 +203,7 @@ export const updateUser = async (id: string, updates: Partial<User>) => {
 };
 
 export const getUserStats = async (uid: string) => {
+  if (!uid) return { assigned: 0, reported: 0, leading: 0 };
   const assigned = await db.issues.where('assigneeId').equals(uid).count();
   const reported = await db.issues.where('reporterId').equals(uid).count();
   const leading = await db.projects.where('leadId').equals(uid).count();

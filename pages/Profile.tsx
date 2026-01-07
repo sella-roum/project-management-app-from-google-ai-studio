@@ -1,12 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, updateUser, getUserStats, getCurrentUserId, clearDatabase } from '../services/mockData';
 import { LogOut, Bell, HelpCircle, ChevronRight, Save, Edit2, Languages, Camera, RefreshCcw, AlertTriangle } from 'lucide-react';
 
-const MenuItem = ({ icon: Icon, label, danger = false, toggle = false, active = false, onToggle }: { icon: any, label: string, danger?: boolean, toggle?: boolean, active?: boolean, onToggle?: () => void }) => (
+const MenuItem = ({ 
+  icon: Icon, 
+  label, 
+  danger = false, 
+  toggle = false, 
+  active = false, 
+  onClick 
+}: { 
+  icon: any, 
+  label: string, 
+  danger?: boolean, 
+  toggle?: boolean, 
+  active?: boolean, 
+  onClick?: () => void 
+}) => (
   <button 
-    onClick={onToggle}
+    type="button"
+    onClick={onClick}
     className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-100 last:border-0"
   >
     <div className="flex items-center gap-3">
@@ -26,6 +42,7 @@ const MenuItem = ({ icon: Icon, label, danger = false, toggle = false, active = 
 export const Profile = () => {
   const user = useLiveQuery(() => getCurrentUser());
   const stats = useLiveQuery(() => getUserStats(getCurrentUserId()));
+  const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -52,7 +69,7 @@ export const Profile = () => {
     if (window.confirm('ログアウトしてもよろしいですか？')) {
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUserId');
-      window.location.reload();
+      navigate('/login');
     }
   };
 
@@ -61,7 +78,7 @@ export const Profile = () => {
       try {
         await clearDatabase();
         localStorage.clear();
-        window.location.reload();
+        navigate('/welcome');
       } catch (e) {
         console.error("Reset failed", e);
         alert("初期化中にエラーが発生しました。");
@@ -149,7 +166,7 @@ export const Profile = () => {
               label="通知を有効にする" 
               toggle 
               active={notificationsEnabled} 
-              onToggle={() => setNotificationsEnabled(!notificationsEnabled)} 
+              onClick={() => setNotificationsEnabled(!notificationsEnabled)} 
             />
             <MenuItem icon={Languages} label="言語 (日本語)" />
           </div>
@@ -158,8 +175,8 @@ export const Profile = () => {
         <div>
           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 ml-1 text-red-400">アカウント</h3>
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <MenuItem icon={LogOut} label="ログアウト" danger onToggle={handleLogout} />
-            <MenuItem icon={RefreshCcw} label="アプリを初期化" danger onToggle={handleResetApp} />
+            <MenuItem icon={LogOut} label="ログアウト" danger onClick={handleLogout} />
+            <MenuItem icon={RefreshCcw} label="アプリを初期化" danger onClick={handleResetApp} />
           </div>
         </div>
 
