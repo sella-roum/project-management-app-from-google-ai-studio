@@ -53,6 +53,7 @@ export const Profile = () => {
   const { confirm } = useConfirm();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
@@ -82,6 +83,8 @@ export const Profile = () => {
     });
 
     if (isConfirmed) {
+      // Set processing to true to prevent rendering the UI that depends on the DB
+      setIsProcessing(true); 
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUserId');
       window.location.reload();
@@ -97,15 +100,31 @@ export const Profile = () => {
     });
 
     if (isConfirmed) {
+      setIsProcessing(true); // Lock UI
       const success = await resetApp();
       if (success) {
         window.location.reload();
       } else {
+        setIsProcessing(false);
         alert('初期化中にエラーが発生しました。');
       }
     }
   };
 
+  // Guard clause: If processing (logging out/resetting) or loading user, show simple loader.
+  // This prevents the component from trying to access `user` properties or rendering sub-components 
+  // that query the DB while the DB is being closed/deleted.
+  if (isProcessing || (!user && !isProcessing)) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="p-8 text-center text-gray-400 text-sm font-bold animate-pulse">
+          {isProcessing ? '処理中...' : '読み込み中...'}
+        </div>
+      </div>
+    );
+  }
+
+  // Double check user existence for TypeScript safety
   if (!user) return null;
 
   return (

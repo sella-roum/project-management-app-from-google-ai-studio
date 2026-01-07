@@ -16,6 +16,7 @@ import { IssueDrawer } from './pages/IssueDrawer';
 import { SetupWizard } from './components/Modals/SetupWizard';
 import { CreateIssueModal } from './components/Modals/CreateIssueModal';
 import { ConfirmProvider } from './providers/ConfirmProvider';
+import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { Issue, IssueStatus } from './types';
 import { Menu, Plus, Search as SearchIcon } from 'lucide-react';
 
@@ -151,10 +152,12 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <Router>
-      <ConfirmProvider>
-        <AppContent />
-      </ConfirmProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <ConfirmProvider>
+          <AppContent />
+        </ConfirmProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }

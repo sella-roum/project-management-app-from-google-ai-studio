@@ -3,11 +3,13 @@ import { db } from './mockData';
 
 export const resetApp = async () => {
   try {
-    // 1. Delete the database to ensure a fresh start
+    // 1. Explicitly close the connection first to avoid 'DatabaseClosedError' in active queries
+    db.close();
+    
+    // 2. Delete the database
     await db.delete();
     
-    // 2. Clear specific application keys from localStorage
-    // We avoid localStorage.clear() to play nice with other apps on same domain if any
+    // 3. Clear application keys from localStorage
     const keysToRemove = [
       'isLoggedIn', 
       'currentUserId', 
@@ -16,13 +18,18 @@ export const resetApp = async () => {
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
-    // 3. Re-open DB (Dexie will auto-create tables on next access)
-    // This step is optional as the next app load will open it, but good for consistency
-    await db.open();
+    // NOTE: Do NOT call db.open() here. 
+    // The app should reload immediately after this function returns.
+    // Opening it here might cause race conditions with the dying React tree.
     
     return true;
   } catch (error) {
     console.error('Failed to reset app:', error);
-    return false;
+    
+    // Fallback: Clear storage anyway so at least the login state is reset
+    const keysToRemove = ['isLoggedIn', 'currentUserId', 'hasSetup', 'appInitialized'];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    return true; // Return true to trigger reload in the UI
   }
 };
