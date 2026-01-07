@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" fill="#ffffff" />
+  <text
+    x="50%"
+    y="52%"
+    text-anchor="middle"
+    font-size="72"
+    fill="#0052CC"
+    font-family="Arial"
+    dy="0.35em"
+  >
+    Mobile
+  </text>
+</svg>
