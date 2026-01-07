@@ -10,11 +10,35 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Start the app (recommended from the monorepo root)
+
+   ```bash
+   npm run mobile:start
+   ```
+
+   If you need to clear Metro's cache:
+
+   ```bash
+   npm run mobile:clear
+   ```
+
+   Or from the `apps/mobile` directory directly:
 
    ```bash
    npx expo start
    ```
+
+   Clear the cache from within `apps/mobile` with:
+
+   ```bash
+   npx expo start --clear
+   ```
+
+3. If you see a "root file not found" error, follow the Expo Router fallback:
+
+   - Switch `apps/mobile/package.json` `main` to `index.js` temporarily.
+   - Start the app again with cache clearing (`npm run mobile:clear`).
+   - After the app boots, switch `main` back to `expo-router/entry`.
 
 In the output, you'll find options to open the app in a
 
