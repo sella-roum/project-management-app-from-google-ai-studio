@@ -1,0 +1,5 @@
+{
+  "name": "JiraMobile Clone (JP)",
+  "description": "Jiraにインスパイアされたモバイルファーストのプロジェクト管理アプリ。カンバンボード、スクラムバックログ、タイムライン、包括的な課題追跡機能を備えています。",
+  "requestFramePermissions": []
+}
