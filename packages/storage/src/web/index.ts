@@ -51,6 +51,10 @@ export const toggleAutomationRule = (id: string, enabled: boolean) =>
 export const createAutomationRule = (
   rule: Parameters<typeof storage.createAutomationRule>[0],
 ) => storage.createAutomationRule(rule);
+export const updateAutomationRule = (
+  id: string,
+  patch: Parameters<typeof storage.updateAutomationRule>[1],
+) => storage.updateAutomationRule(id, patch);
 export const getAutomationLogs = (ruleId: string) =>
   storage.getAutomationLogs(ruleId);
 export const getIssueById = (id: string) => storage.getIssueById(id);
@@ -99,6 +103,11 @@ export const getSavedFilters = (ownerId?: string) =>
   storage.getSavedFilters(ownerId);
 export const saveFilter = (name: string, query: string, ownerId?: string) =>
   storage.saveFilter(name, query, ownerId);
+export const updateSavedFilter = (
+  id: string,
+  patch: Parameters<typeof storage.updateSavedFilter>[1],
+) => storage.updateSavedFilter(id, patch);
+export const deleteSavedFilter = (id: string) => storage.deleteSavedFilter(id);
 export const setupInitialProject = (
   name: string,
   key: string,
