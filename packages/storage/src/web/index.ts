@@ -51,6 +51,10 @@ export const toggleAutomationRule = (id: string, enabled: boolean) =>
 export const createAutomationRule = (
   rule: Parameters<typeof storage.createAutomationRule>[0],
 ) => storage.createAutomationRule(rule);
+export const updateAutomationRule = (
+  id: string,
+  patch: Parameters<typeof storage.updateAutomationRule>[1],
+) => storage.updateAutomationRule(id, patch);
 export const getAutomationLogs = (ruleId: string) =>
   storage.getAutomationLogs(ruleId);
 export const getIssueById = (id: string) => storage.getIssueById(id);
