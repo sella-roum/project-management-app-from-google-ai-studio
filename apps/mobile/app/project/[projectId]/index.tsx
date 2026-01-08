@@ -7,6 +7,11 @@ import {
   TextInput,
 } from "react-native";
 
+import {
+  CATEGORY_LABELS,
+  DEFAULT_NOTIFICATION_SCHEME,
+  WORKFLOW_TRANSITIONS,
+} from "@repo/core";
 import type { Issue, Project, Version } from "@repo/core";
 import {
   createVersion,
@@ -49,7 +54,16 @@ export default function ProjectViewScreen() {
   const [projectName, setProjectName] = useState("");
   const [projectKey, setProjectKey] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
+  const [projectCategory, setProjectCategory] = useState<
+    Project["category"] | ""
+  >("");
   const [newVersionName, setNewVersionName] = useState("");
+  const [workflowSettings, setWorkflowSettings] = useState<
+    Record<string, string[]>
+  >({});
+  const [notificationSettings, setNotificationSettings] = useState<
+    Record<string, string[]>
+  >({});
   const [automationRules, setAutomationRules] = useState<
     { id: string; name: string; enabled: boolean }[]
   >([]);
@@ -70,6 +84,24 @@ export default function ProjectViewScreen() {
     setProjectName(projectData?.name ?? "");
     setProjectKey(projectData?.key ?? "");
     setProjectDescription(projectData?.description ?? "");
+    setProjectCategory(projectData?.category ?? "");
+    const workflow =
+      projectData?.workflowSettings ?? WORKFLOW_TRANSITIONS;
+    const notifications =
+      projectData?.notificationSettings ?? DEFAULT_NOTIFICATION_SCHEME;
+    setWorkflowSettings(
+      Object.fromEntries(
+        Object.entries(workflow).map(([status, next]) => [status, [...next]]),
+      ),
+    );
+    setNotificationSettings(
+      Object.fromEntries(
+        Object.entries(notifications).map(([event, recipients]) => [
+          event,
+          [...recipients],
+        ]),
+      ),
+    );
   }, [normalizedProjectId]);
 
   useEffect(() => {
@@ -81,8 +113,10 @@ export default function ProjectViewScreen() {
     if (!normalizedProjectId) return;
     await updateProject(normalizedProjectId, {
       name: projectName,
-      key: projectKey,
       description: projectDescription,
+      category: projectCategory || project?.category || "Software",
+      workflowSettings,
+      notificationSettings,
     });
     await reload();
   };
@@ -120,6 +154,23 @@ export default function ProjectViewScreen() {
       return acc;
     }, {});
   }, [issues]);
+
+  const notificationLabels = useMemo(
+    () => ({
+      issue_created: "課題の作成",
+      issue_updated: "課題の更新",
+      issue_assigned: "課題の割り当て",
+      comment_added: "コメント投稿",
+      issue_resolved: "課題の解決",
+    }),
+    [],
+  );
+
+  const parseListInput = (value: string) =>
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -262,14 +313,95 @@ export default function ProjectViewScreen() {
                 style={styles.input}
                 placeholder="Project key"
                 value={projectKey}
-                onChangeText={(value) => setProjectKey(value.toUpperCase())}
+                editable={false}
               />
+              <ThemedView style={styles.fieldGroup}>
+                <ThemedText type="defaultSemiBold">Category</ThemedText>
+                <ThemedView style={styles.inlineRow}>
+                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => {
+                    const selected = projectCategory === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        onPress={() =>
+                          setProjectCategory(
+                            value as Project["category"],
+                          )
+                        }
+                        style={[
+                          styles.chip,
+                          selected && styles.chipSelected,
+                        ]}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.chipText,
+                            selected && styles.chipTextSelected,
+                          ]}
+                        >
+                          {label}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ThemedView>
+              </ThemedView>
               <TextInput
                 style={styles.input}
                 placeholder="Description"
                 value={projectDescription}
                 onChangeText={setProjectDescription}
               />
+              <ThemedView style={styles.settingsGroup}>
+                <ThemedText type="defaultSemiBold">Workflow</ThemedText>
+                <ThemedText style={styles.helperText}>
+                  Next statuses (comma-separated)
+                </ThemedText>
+                {Object.keys(WORKFLOW_TRANSITIONS).map((status) => (
+                  <ThemedView key={status} style={styles.fieldGroup}>
+                    <ThemedText>{status}</ThemedText>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="In Progress, Done"
+                      value={(workflowSettings[status] ?? []).join(", ")}
+                      onChangeText={(value) =>
+                        setWorkflowSettings((prev) => ({
+                          ...prev,
+                          [status]: parseListInput(value),
+                        }))
+                      }
+                    />
+                  </ThemedView>
+                ))}
+              </ThemedView>
+              <ThemedView style={styles.settingsGroup}>
+                <ThemedText type="defaultSemiBold">
+                  Notification scheme
+                </ThemedText>
+                <ThemedText style={styles.helperText}>
+                  Recipients (comma-separated)
+                </ThemedText>
+                {Object.keys(DEFAULT_NOTIFICATION_SCHEME).map((eventKey) => (
+                  <ThemedView key={eventKey} style={styles.fieldGroup}>
+                    <ThemedText>
+                      {notificationLabels[
+                        eventKey as keyof typeof notificationLabels
+                      ] ?? eventKey}
+                    </ThemedText>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Reporter, Assignee"
+                      value={(notificationSettings[eventKey] ?? []).join(", ")}
+                      onChangeText={(value) =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          [eventKey]: parseListInput(value),
+                        }))
+                      }
+                    />
+                  </ThemedView>
+                ))}
+              </ThemedView>
               <Pressable onPress={handleSaveSettings} style={styles.primaryBtn}>
                 <ThemedText type="link">Save settings</ThemedText>
               </Pressable>
@@ -301,6 +433,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#dc2626",
     borderRadius: 12,
     paddingVertical: 12,
+  },
+  chip: {
+    backgroundColor: "#f3f4f6",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipSelected: {
+    backgroundColor: "#2563eb",
+  },
+  chipText: {
+    color: "#111827",
+    fontSize: 12,
+  },
+  chipTextSelected: {
+    color: "#ffffff",
+  },
+  fieldGroup: {
+    gap: 6,
+  },
+  helperText: {
+    color: "#6b7280",
+    fontSize: 12,
+  },
+  inlineRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   input: {
     borderColor: "#e5e7eb",
@@ -335,5 +495,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     paddingVertical: 8,
+  },
+  settingsGroup: {
+    gap: 12,
   },
 });
