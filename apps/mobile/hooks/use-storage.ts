@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { checkIfDatabaseIsSeeded, seedDatabase } from "@repo/storage";
+import { checkIfDatabaseIsSeeded } from "@repo/storage";
 
 export const useStorageReady = () => {
   const [ready, setReady] = useState(false);
@@ -8,10 +8,7 @@ export const useStorageReady = () => {
   useEffect(() => {
     let active = true;
     const bootstrap = async () => {
-      const isSeeded = await checkIfDatabaseIsSeeded();
-      if (!isSeeded) {
-        await seedDatabase();
-      }
+      await checkIfDatabaseIsSeeded();
       if (active) setReady(true);
     };
 
