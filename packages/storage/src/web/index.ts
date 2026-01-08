@@ -99,6 +99,11 @@ export const getSavedFilters = (ownerId?: string) =>
   storage.getSavedFilters(ownerId);
 export const saveFilter = (name: string, query: string, ownerId?: string) =>
   storage.saveFilter(name, query, ownerId);
+export const updateSavedFilter = (
+  id: string,
+  patch: Parameters<typeof storage.updateSavedFilter>[1],
+) => storage.updateSavedFilter(id, patch);
+export const deleteSavedFilter = (id: string) => storage.deleteSavedFilter(id);
 export const setupInitialProject = (
   name: string,
   key: string,
