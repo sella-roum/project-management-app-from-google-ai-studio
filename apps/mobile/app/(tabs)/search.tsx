@@ -15,6 +15,8 @@ import {
   getProjects,
   getSavedFilters,
   saveFilter,
+  updateSavedFilter,
+  deleteSavedFilter,
 } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
@@ -30,7 +32,7 @@ export default function SearchScreen() {
   const [filterProjectId, setFilterProjectId] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
   const [savedFilters, setSavedFilters] = useState<
-    { id: string; name: string; query: string }[]
+    { id: string; name: string; query: string; isFavorite: boolean }[]
   >([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
@@ -51,6 +53,11 @@ export default function SearchScreen() {
     };
     void load();
   }, [ready]);
+
+  const reloadSavedFilters = async () => {
+    const saved = await getSavedFilters();
+    setSavedFilters(saved);
+  };
 
   const filteredIssues = useMemo(() => {
     const currentUserId = getCurrentUserId();
@@ -92,10 +99,19 @@ export default function SearchScreen() {
           : `reporterId = ${uid}`;
     }
     await saveFilter(filterName, finalQuery);
-    const saved = await getSavedFilters();
-    setSavedFilters(saved);
+    await reloadSavedFilters();
     setFilterName("");
     setActiveTab("saved");
+  };
+
+  const handleToggleFavorite = async (id: string, isFavorite: boolean) => {
+    await updateSavedFilter(id, { isFavorite: !isFavorite });
+    await reloadSavedFilters();
+  };
+
+  const handleDeleteFilter = async (id: string) => {
+    await deleteSavedFilter(id);
+    await reloadSavedFilters();
   };
 
   const JQL_FIELDS = [
@@ -240,20 +256,45 @@ export default function SearchScreen() {
 
       {activeTab === "saved" ? (
         <ThemedView style={styles.section}>
-          {savedFilters.map((filter) => (
-            <Pressable
-              key={filter.id}
-              onPress={() => {
-                setIsJqlMode(true);
-                setQuery(filter.query);
-                setActiveTab("all");
-              }}
-              style={styles.card}
-            >
-              <ThemedText type="defaultSemiBold">{filter.name}</ThemedText>
-              <ThemedText>{filter.query}</ThemedText>
-            </Pressable>
-          ))}
+          {savedFilters.length === 0 ? (
+            <ThemedText>保存済みフィルタはありません。</ThemedText>
+          ) : (
+            savedFilters.map((filter) => (
+              <ThemedView key={filter.id} style={styles.card}>
+                <Pressable
+                  onPress={() => {
+                    setIsJqlMode(true);
+                    setQuery(filter.query);
+                    setActiveTab("all");
+                  }}
+                >
+                  <ThemedText type="defaultSemiBold">{filter.name}</ThemedText>
+                  <ThemedText>{filter.query}</ThemedText>
+                </Pressable>
+                <ThemedView style={styles.savedFilterActions}>
+                  <Pressable
+                    onPress={() =>
+                      handleToggleFavorite(filter.id, filter.isFavorite)
+                    }
+                    style={[
+                      styles.savedFilterAction,
+                      filter.isFavorite && styles.savedFilterActionActive,
+                    ]}
+                  >
+                    <ThemedText>
+                      {filter.isFavorite ? "★ お気に入り" : "☆ お気に入り"}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleDeleteFilter(filter.id)}
+                    style={[styles.savedFilterAction, styles.savedFilterDelete]}
+                  >
+                    <ThemedText>削除</ThemedText>
+                  </Pressable>
+                </ThemedView>
+              </ThemedView>
+            ))
+          )}
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
@@ -320,6 +361,25 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 12,
+  },
+  savedFilterAction: {
+    borderColor: "#e5e7eb",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  savedFilterActionActive: {
+    borderColor: "#2563eb",
+  },
+  savedFilterActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  savedFilterDelete: {
+    borderColor: "#fca5a5",
   },
   suggestions: {
     gap: 6,

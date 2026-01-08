@@ -16,12 +16,16 @@ import {
   getIssues,
   getProjects,
   getSavedFilters,
-  saveFilter,
 } from "@repo/storage";
 import { IssueCard } from "../components/Common/IssueCard";
 import { Issue } from "../types";
 import { useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
+import {
+  removeSavedFilter,
+  saveCurrentFilter,
+  toggleSavedFilterFavorite,
+} from "./savedFilterActions";
 
 const JQL_FIELDS = [
   "status",
@@ -80,18 +84,23 @@ export const Search = ({
 
   const handleSaveFilter = async () => {
     if (!filterName) return;
-    let finalQuery = query;
-    if (!isJqlMode && activeFilter) {
-      const uid = getCurrentUserId();
-      finalQuery =
-        activeFilter === "assigned"
-          ? `assigneeId = ${uid}`
-          : `reporterId = ${uid}`;
-    }
-    await saveFilter(filterName, finalQuery);
+    await saveCurrentFilter({
+      filterName,
+      query,
+      isJqlMode,
+      activeFilter,
+    });
     setFilterName("");
     setSaveModalOpen(false);
     setActiveTab("saved");
+  };
+
+  const handleToggleFavorite = async (id: string, isFavorite: boolean) => {
+    await toggleSavedFilterFavorite(id, isFavorite);
+  };
+
+  const handleDeleteFilter = async (id: string) => {
+    await removeSavedFilter(id);
   };
 
   const filteredIssues =
@@ -229,26 +238,61 @@ export const Search = ({
       {activeTab === "saved" ? (
         <div className="space-y-3 animate-fadeIn">
           {savedFilters.map((f) => (
-            <button
+            <div
               key={f.id}
-              onClick={() => {
-                setIsJqlMode(true);
-                setQuery(f.query);
-                setActiveTab("all");
-              }}
-              className="w-full text-left bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-primary transition-all"
+              className="w-full bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-primary transition-all"
             >
-              <div>
+              <button
+                onClick={() => {
+                  setIsJqlMode(true);
+                  setQuery(f.query);
+                  setActiveTab("all");
+                }}
+                className="flex-1 text-left"
+              >
                 <div className="font-bold text-gray-800">{f.name}</div>
                 <div className="text-[10px] text-gray-400 font-mono mt-1">
                   {f.query}
                 </div>
+              </button>
+              <div className="flex items-center gap-2 pl-4">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleToggleFavorite(f.id, f.isFavorite);
+                  }}
+                  className="p-2 rounded-full hover:bg-gray-50"
+                  aria-label={
+                    f.isFavorite
+                      ? "お気に入りを解除"
+                      : "お気に入りに追加"
+                  }
+                >
+                  <Bookmark
+                    size={16}
+                    className={
+                      f.isFavorite
+                        ? "text-primary fill-current"
+                        : "text-gray-300"
+                    }
+                  />
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleDeleteFilter(f.id);
+                  }}
+                  className="p-2 rounded-full hover:bg-red-50"
+                  aria-label="保存済みフィルタを削除"
+                >
+                  <XCircle size={16} className="text-gray-300" />
+                </button>
+                <ChevronDown
+                  size={16}
+                  className="-rotate-90 text-gray-300 group-hover:text-primary"
+                />
               </div>
-              <ChevronDown
-                size={16}
-                className="-rotate-90 text-gray-300 group-hover:text-primary"
-              />
-            </button>
+            </div>
           ))}
           {savedFilters.length === 0 && (
             <div className="text-center py-20 text-gray-400 text-xs font-bold uppercase">
