@@ -12,16 +12,20 @@ import type {
   Sprint,
   User,
   Version,
+  ViewHistory,
   WorkLog,
 } from "@repo/core";
 import {
   buildProjectStats,
   DEFAULT_NOTIFICATION_SCHEME,
+  evaluateAutomationCondition,
   getSeedIssues,
   getSeedNotifications,
   getSeedProjects,
   getSeedSprints,
   getSeedUsers,
+  selectRecentIssues,
+  sortAutomationLogsByExecutedAt,
   WORKFLOW_TRANSITIONS,
 } from "@repo/core";
 import type {
@@ -42,6 +46,14 @@ type SQLiteRow = {
   projectId?: string;
   email?: string;
   read?: number;
+  userId?: string;
+  issueId?: string;
+  viewedAt?: string;
+  ownerId?: string;
+  ruleId?: string;
+  status?: string;
+  enabled?: number;
+  executedAt?: string;
 };
 
 const noopUnsubscribe: Unsubscribe = () => undefined;
@@ -137,6 +149,42 @@ export class SQLiteStorageAdapter implements AppStorage {
         read INTEGER NOT NULL DEFAULT 0,
         data TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS view_history (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        issueId TEXT NOT NULL,
+        viewedAt TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS view_history_user ON view_history (userId);
+      CREATE INDEX IF NOT EXISTS view_history_issue ON view_history (issueId);
+      CREATE TABLE IF NOT EXISTS versions (
+        id TEXT PRIMARY KEY NOT NULL,
+        projectId TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS versions_project ON versions (projectId);
+      CREATE TABLE IF NOT EXISTS saved_filters (
+        id TEXT PRIMARY KEY NOT NULL,
+        ownerId TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS saved_filters_owner ON saved_filters (ownerId);
+      CREATE TABLE IF NOT EXISTS automation_rules (
+        id TEXT PRIMARY KEY NOT NULL,
+        projectId TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS automation_rules_project ON automation_rules (projectId);
+      CREATE TABLE IF NOT EXISTS automation_logs (
+        id TEXT PRIMARY KEY NOT NULL,
+        ruleId TEXT NOT NULL,
+        status TEXT NOT NULL,
+        executedAt TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS automation_logs_rule ON automation_logs (ruleId);
     `);
     const storedUserId = await this.settings.get("currentUserId");
     if (storedUserId) {
@@ -297,21 +345,31 @@ export class SQLiteStorageAdapter implements AppStorage {
     );
     const count = countRow?.count ?? 0;
     const nowIso = new Date().toISOString();
+    const currentUserId = this.getCurrentUserId();
     const issue: Issue = {
       id: input.id ?? `i-${Date.now()}`,
-      key: `${project?.key ?? "PRJ"}-${count + 1}`,
+      key: `${project?.key ?? "PRJ"}-${count + 101}`,
       projectId: input.projectId,
-      title: input.title,
+      title: input.title || "無題",
       type: input.type ?? "Task",
       status: input.status ?? "To Do",
       priority: input.priority ?? "Medium",
       assigneeId: input.assigneeId,
-      reporterId: input.reporterId ?? "u1",
+      reporterId: input.reporterId ?? currentUserId,
       sprintId: input.sprintId,
       labels: input.labels ?? [],
       comments: input.comments ?? [],
       workLogs: input.workLogs ?? [],
-      history: input.history ?? [],
+      history: input.history ?? [
+        {
+          id: `h-${Date.now()}`,
+          authorId: currentUserId,
+          field: "status",
+          from: null,
+          to: input.status ?? "To Do",
+          createdAt: nowIso,
+        },
+      ],
       links: input.links ?? [],
       attachments: input.attachments ?? [],
       watcherIds: input.watcherIds ?? [],
@@ -322,6 +380,7 @@ export class SQLiteStorageAdapter implements AppStorage {
       "INSERT OR REPLACE INTO issues (id, projectId, data) VALUES (?, ?, ?)",
       [issue.id, issue.projectId, JSON.stringify(issue)],
     );
+    await this.runAutomation("issue_created", issue);
     return issue;
   };
 
@@ -339,6 +398,9 @@ export class SQLiteStorageAdapter implements AppStorage {
       "UPDATE issues SET data = ?, projectId = ? WHERE id = ?",
       [JSON.stringify(updated), updated.projectId, id],
     );
+    if (patch.status && patch.status !== existing.status) {
+      await this.runAutomation("status_changed", updated);
+    }
     return updated;
   };
 
@@ -460,6 +522,11 @@ export class SQLiteStorageAdapter implements AppStorage {
       DELETE FROM sprints;
       DELETE FROM projects;
       DELETE FROM users;
+      DELETE FROM view_history;
+      DELETE FROM versions;
+      DELETE FROM saved_filters;
+      DELETE FROM automation_rules;
+      DELETE FROM automation_logs;
     `);
   };
 
@@ -608,7 +675,8 @@ export class SQLiteStorageAdapter implements AppStorage {
         createdAt: new Date().toISOString(),
       },
     ];
-    await this.updateIssueInternal(id, { comments });
+    const updated = await this.updateIssueInternal(id, { comments });
+    await this.runAutomation("comment_added", updated);
   };
 
   addIssueLink = async (
@@ -651,9 +719,39 @@ export class SQLiteStorageAdapter implements AppStorage {
     await this.updateIssueInternal(issueId, { watcherIds });
   };
 
-  recordView = async (_issueId: string): Promise<void> => undefined;
+  recordView = async (issueId: string): Promise<void> => {
+    const db = await this.getDb();
+    const currentUserId = this.getCurrentUserId();
+    const history: ViewHistory = {
+      id: `${currentUserId}-${issueId}`,
+      userId: currentUserId,
+      issueId,
+      viewedAt: new Date().toISOString(),
+    };
+    await db.runAsync(
+      "INSERT OR REPLACE INTO view_history (id, userId, issueId, viewedAt, data) VALUES (?, ?, ?, ?, ?)",
+      [
+        history.id,
+        history.userId,
+        history.issueId,
+        history.viewedAt,
+        JSON.stringify(history),
+      ],
+    );
+  };
 
-  getRecentIssues = async (): Promise<Issue[]> => [];
+  getRecentIssues = async (): Promise<Issue[]> => {
+    const db = await this.getDb();
+    const currentUserId = this.getCurrentUserId();
+    const rows = await db.getAllAsync<SQLiteRow>(
+      "SELECT data FROM view_history WHERE userId = ? ORDER BY viewedAt DESC",
+      [currentUserId],
+    );
+    const history = rows.map((row) => JSON.parse(row.data) as ViewHistory);
+    if (history.length === 0) return [];
+    const issues = await this.queryAll<Issue>("SELECT data FROM issues");
+    return selectRecentIssues(history, issues);
+  };
 
   getSprints = async (projectId: string): Promise<Sprint[]> =>
     this.listSprintsInternal(projectId);
@@ -666,76 +764,206 @@ export class SQLiteStorageAdapter implements AppStorage {
     status: "active" | "future" | "completed",
   ): Promise<Sprint> => this.updateSprintInternal(id, { status });
 
-  getVersions = async (_projectId: string): Promise<Version[]> => [];
+  getVersions = async (projectId: string): Promise<Version[]> =>
+    this.queryAll<Version>("SELECT data FROM versions WHERE projectId = ?", [
+      projectId,
+    ]);
 
-  createVersion = async (version: Partial<Version>): Promise<Version> => ({
-    id: `v-${Date.now()}`,
-    status: "unreleased",
-    ...version,
-  });
+  createVersion = async (version: Partial<Version>): Promise<Version> => {
+    const newVersion = {
+      id: `v-${Date.now()}`,
+      status: "unreleased",
+      ...version,
+    } as Version;
+    const db = await this.getDb();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO versions (id, projectId, data) VALUES (?, ?, ?)",
+      [newVersion.id, newVersion.projectId, JSON.stringify(newVersion)],
+    );
+    return newVersion;
+  };
 
   updateVersion = async (
     id: string,
     patch: Partial<Version>,
-  ): Promise<Version> => ({
-    id,
-    status: patch.status ?? "unreleased",
-    ...patch,
-  });
+  ): Promise<Version> => {
+    const existing = await this.queryFirst<Version>(
+      "SELECT data FROM versions WHERE id = ?",
+      [id],
+    );
+    if (!existing) {
+      throw new Error(`Version not found: ${id}`);
+    }
+    const updated = { ...existing, ...patch };
+    const db = await this.getDb();
+    await db.runAsync("UPDATE versions SET data = ?, projectId = ? WHERE id = ?", [
+      JSON.stringify(updated),
+      updated.projectId,
+      id,
+    ]);
+    return updated;
+  };
 
-  deleteVersion = async (_id: string): Promise<void> => undefined;
+  deleteVersion = async (id: string): Promise<void> => {
+    const db = await this.getDb();
+    await db.runAsync("DELETE FROM versions WHERE id = ?", [id]);
+  };
 
-  getSavedFilters = async (_ownerId?: string): Promise<SavedFilter[]> => [];
+  getSavedFilters = async (ownerId?: string): Promise<SavedFilter[]> => {
+    if (!ownerId) {
+      return this.queryAll<SavedFilter>("SELECT data FROM saved_filters");
+    }
+    return this.queryAll<SavedFilter>(
+      "SELECT data FROM saved_filters WHERE ownerId = ?",
+      [ownerId],
+    );
+  };
 
   saveFilter = async (
     name: string,
     query: string,
     ownerId?: string,
-  ): Promise<SavedFilter> => ({
-    id: `f-${Date.now()}`,
-    name,
-    query,
-    ownerId: ownerId ?? this.getCurrentUserId(),
-    isFavorite: false,
-  });
+  ): Promise<SavedFilter> => {
+    const newFilter: SavedFilter = {
+      id: `f-${Date.now()}`,
+      name,
+      query,
+      ownerId: ownerId ?? this.getCurrentUserId(),
+      isFavorite: false,
+    };
+    const db = await this.getDb();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO saved_filters (id, ownerId, data) VALUES (?, ?, ?)",
+      [newFilter.id, newFilter.ownerId, JSON.stringify(newFilter)],
+    );
+    return newFilter;
+  };
 
   updateSavedFilter = async (
     id: string,
     patch: Partial<SavedFilter>,
-  ): Promise<SavedFilter> => ({
-    id,
-    name: patch.name ?? "Saved filter",
-    query: patch.query ?? "",
-    ownerId: patch.ownerId ?? this.getCurrentUserId(),
-    isFavorite: patch.isFavorite ?? false,
-  });
+  ): Promise<SavedFilter> => {
+    const existing = await this.queryFirst<SavedFilter>(
+      "SELECT data FROM saved_filters WHERE id = ?",
+      [id],
+    );
+    if (!existing) {
+      throw new Error(`Saved filter not found: ${id}`);
+    }
+    const updated = { ...existing, ...patch };
+    const db = await this.getDb();
+    await db.runAsync(
+      "UPDATE saved_filters SET data = ?, ownerId = ? WHERE id = ?",
+      [JSON.stringify(updated), updated.ownerId, id],
+    );
+    return updated;
+  };
 
-  deleteSavedFilter = async (_id: string): Promise<void> => undefined;
+  deleteSavedFilter = async (id: string): Promise<void> => {
+    const db = await this.getDb();
+    await db.runAsync("DELETE FROM saved_filters WHERE id = ?", [id]);
+  };
 
-  runAutomation = async (
-    _trigger: string,
-    _issue: Issue,
-  ): Promise<void> => undefined;
+  runAutomation = async (trigger: string, issue: Issue): Promise<void> => {
+    const db = await this.getDb();
+    const rules = await this.queryAll<AutomationRule>(
+      "SELECT data FROM automation_rules WHERE projectId = ?",
+      [issue.projectId],
+    );
+    for (const rule of rules) {
+      if (!rule.enabled || rule.trigger !== trigger) continue;
+      if (!evaluateAutomationCondition(rule.condition, issue)) continue;
+      try {
+        if (rule.action === "assign_reporter") {
+          await this.updateIssue(issue.id, { assigneeId: issue.reporterId });
+        } else if (rule.action === "add_comment") {
+          await this.addComment(
+            issue.id,
+            "自動化ルールによってシステムコメントが追加されました。",
+          );
+        } else if (rule.action === "set_priority_high") {
+          await this.updateIssue(issue.id, { priority: "High" });
+        }
 
-  getAutomationRules = async (
-    _projectId: string,
-  ): Promise<AutomationRule[]> => [];
+        const log: AutomationLog = {
+          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          ruleId: rule.id,
+          status: "success",
+          message: `ルール「${rule.name}」が実行されました。`,
+          executedAt: new Date().toISOString(),
+        };
+        await db.runAsync(
+          "INSERT OR REPLACE INTO automation_logs (id, ruleId, status, executedAt, data) VALUES (?, ?, ?, ?, ?)",
+          [log.id, log.ruleId, log.status, log.executedAt, JSON.stringify(log)],
+        );
+        await db.runAsync(
+          "UPDATE automation_rules SET data = ? WHERE id = ?",
+          [JSON.stringify({ ...rule, lastRun: log.executedAt }), rule.id],
+        );
+      } catch (error) {
+        const log: AutomationLog = {
+          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          ruleId: rule.id,
+          status: "failure",
+          message: `エラー: ${error instanceof Error ? error.message : String(error)}`,
+          executedAt: new Date().toISOString(),
+        };
+        await db.runAsync(
+          "INSERT OR REPLACE INTO automation_logs (id, ruleId, status, executedAt, data) VALUES (?, ?, ?, ?, ?)",
+          [log.id, log.ruleId, log.status, log.executedAt, JSON.stringify(log)],
+        );
+      }
+    }
+  };
 
-  toggleAutomationRule = async (_id: string, _enabled: boolean) => undefined;
+  getAutomationRules = async (projectId: string): Promise<AutomationRule[]> =>
+    this.queryAll<AutomationRule>(
+      "SELECT data FROM automation_rules WHERE projectId = ?",
+      [projectId],
+    );
+
+  toggleAutomationRule = async (id: string, enabled: boolean) => {
+    const existing = await this.queryFirst<AutomationRule>(
+      "SELECT data FROM automation_rules WHERE id = ?",
+      [id],
+    );
+    if (!existing) return;
+    const updated = { ...existing, enabled };
+    const db = await this.getDb();
+    await db.runAsync(
+      "UPDATE automation_rules SET data = ?, enabled = ? WHERE id = ?",
+      [JSON.stringify(updated), enabled ? 1 : 0, id],
+    );
+  };
 
   createAutomationRule = async (
     rule: Partial<AutomationRule>,
-  ): Promise<AutomationRule> => ({
-    id: `ar-${Date.now()}`,
-    enabled: true,
-    name: rule.name ?? "Automation rule",
-    projectId: rule.projectId ?? "",
-    trigger: rule.trigger ?? "issue_created",
-    condition: rule.condition ?? {},
-    action: rule.action ?? "add_comment",
-  });
+  ): Promise<AutomationRule> => {
+    const newRule: AutomationRule = {
+      id: `ar-${Date.now()}`,
+      enabled: true,
+      name: rule.name ?? "Automation rule",
+      projectId: rule.projectId ?? "",
+      trigger: rule.trigger ?? "issue_created",
+      condition: rule.condition ?? "",
+      action: rule.action ?? "add_comment",
+      description: rule.description ?? "",
+    };
+    const db = await this.getDb();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO automation_rules (id, projectId, enabled, data) VALUES (?, ?, ?, ?)",
+      [newRule.id, newRule.projectId, 1, JSON.stringify(newRule)],
+    );
+    return newRule;
+  };
 
-  getAutomationLogs = async (_ruleId: string): Promise<AutomationLog[]> => [];
+  getAutomationLogs = async (ruleId: string): Promise<AutomationLog[]> => {
+    const rows = await this.queryAll<AutomationLog>(
+      "SELECT data FROM automation_logs WHERE ruleId = ?",
+      [ruleId],
+    );
+    return sortAutomationLogsByExecutedAt(rows);
+  };
 
   setupInitialProject = async (
     name: string,
@@ -760,6 +988,11 @@ export class SQLiteStorageAdapter implements AppStorage {
       DELETE FROM issues;
       DELETE FROM sprints;
       DELETE FROM projects;
+      DELETE FROM view_history;
+      DELETE FROM versions;
+      DELETE FROM saved_filters;
+      DELETE FROM automation_rules;
+      DELETE FROM automation_logs;
     `);
 
     for (const user of SEED_USERS) {
@@ -813,6 +1046,11 @@ export class SQLiteStorageAdapter implements AppStorage {
       DELETE FROM issues;
       DELETE FROM sprints;
       DELETE FROM projects;
+      DELETE FROM view_history;
+      DELETE FROM versions;
+      DELETE FROM saved_filters;
+      DELETE FROM automation_rules;
+      DELETE FROM automation_logs;
     `);
 
     const keysToRemove = [

@@ -45,6 +45,9 @@ export default function HomeScreen() {
       <Link href="/(tabs)/projects">
         <ThemedText type="link">Browse projects</ThemedText>
       </Link>
+      <Link href={{ pathname: "/modal", params: { mode: "issue" } }}>
+        <ThemedText type="link">Create issue</ThemedText>
+      </Link>
     </ThemedView>
   );
 }
