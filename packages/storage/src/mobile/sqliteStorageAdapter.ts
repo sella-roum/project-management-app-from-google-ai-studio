@@ -957,6 +957,31 @@ export class SQLiteStorageAdapter implements AppStorage {
     return newRule;
   };
 
+  updateAutomationRule = async (
+    id: string,
+    patch: Partial<AutomationRule>,
+  ): Promise<AutomationRule> => {
+    const existing = await this.queryFirst<AutomationRule>(
+      "SELECT data FROM automation_rules WHERE id = ?",
+      [id],
+    );
+    if (!existing) {
+      throw new Error(`Automation rule not found: ${id}`);
+    }
+    const updated: AutomationRule = { ...existing, ...patch };
+    const db = await this.getDb();
+    await db.runAsync(
+      "UPDATE automation_rules SET data = ?, enabled = ?, projectId = ? WHERE id = ?",
+      [
+        JSON.stringify(updated),
+        updated.enabled ? 1 : 0,
+        updated.projectId,
+        id,
+      ],
+    );
+    return updated;
+  };
+
   getAutomationLogs = async (ruleId: string): Promise<AutomationLog[]> => {
     const rows = await this.queryAll<AutomationLog>(
       "SELECT data FROM automation_logs WHERE ruleId = ?",
