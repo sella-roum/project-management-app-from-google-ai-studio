@@ -110,6 +110,7 @@ export default function ProjectViewScreen() {
 
   const handleOpenIssue = async (issueId: string) => {
     await recordView(issueId);
+    router.push(`/issue/${issueId}`);
   };
 
   const groupedIssues = useMemo(() => {

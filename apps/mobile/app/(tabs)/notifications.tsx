@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { Pressable, ScrollView, StyleSheet } from "react-native";
+import { useRouter } from "expo-router";
 
 import type { Notification } from "@repo/core";
 import { getNotifications, markAllNotificationsRead } from "@repo/storage";
@@ -9,6 +10,7 @@ import { ThemedView } from "@/components/themed-view";
 import { useStorageReady } from "@/hooks/use-storage";
 
 export default function NotificationsScreen() {
+  const router = useRouter();
   const ready = useStorageReady();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -43,16 +45,26 @@ export default function NotificationsScreen() {
       ) : (
         <ThemedView style={styles.list}>
           {notifications.map((notification) => (
-            <ThemedView key={notification.id} style={styles.card}>
-              <ThemedText type="defaultSemiBold">
-                {notification.title}
-              </ThemedText>
-              <ThemedText>{notification.description}</ThemedText>
-              <ThemedText>
-                {notification.read ? "Read" : "Unread"} •{" "}
-                {new Date(notification.createdAt).toLocaleString()}
-              </ThemedText>
-            </ThemedView>
+            <Pressable
+              key={notification.id}
+              onPress={
+                notification.issueId
+                  ? () => router.push(`/issue/${notification.issueId}`)
+                  : undefined
+              }
+              disabled={!notification.issueId}
+            >
+              <ThemedView style={styles.card}>
+                <ThemedText type="defaultSemiBold">
+                  {notification.title}
+                </ThemedText>
+                <ThemedText>{notification.description}</ThemedText>
+                <ThemedText>
+                  {notification.read ? "Read" : "Unread"} •{" "}
+                  {new Date(notification.createdAt).toLocaleString()}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
           ))}
         </ThemedView>
       )}

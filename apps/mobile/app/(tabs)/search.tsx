@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TextInput,
 } from "react-native";
+import { useRouter } from "expo-router";
 
 import type { Issue } from "@repo/core";
 import { executeJQL } from "@repo/core";
@@ -21,6 +22,7 @@ import { ThemedView } from "@/components/themed-view";
 import { useStorageReady } from "@/hooks/use-storage";
 
 export default function SearchScreen() {
+  const router = useRouter();
   const ready = useStorageReady();
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -256,11 +258,15 @@ export default function SearchScreen() {
       ) : (
         <ThemedView style={styles.section}>
           {filteredIssues.map((issue) => (
-            <ThemedView key={issue.id} style={styles.card}>
+            <Pressable
+              key={issue.id}
+              onPress={() => router.push(`/issue/${issue.id}`)}
+              style={styles.card}
+            >
               <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
               <ThemedText>{issue.title}</ThemedText>
               <ThemedText>{issue.status}</ThemedText>
-            </ThemedView>
+            </Pressable>
           ))}
           {!ready ? <ThemedText>Loading...</ThemedText> : null}
           {ready && filteredIssues.length === 0 ? (
