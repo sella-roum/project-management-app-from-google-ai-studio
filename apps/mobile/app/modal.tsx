@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput } from "react-native";
 
 import type { IssuePriority, IssueStatus, IssueType, Project } from "@repo/core";
+import { CATEGORY_LABELS } from "@repo/core";
 import { USERS, createIssue, createProject, getProjects } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
@@ -29,6 +30,9 @@ export default function ModalScreen() {
   const [projectName, setProjectName] = useState("");
   const [projectKey, setProjectKey] = useState("");
   const [projectType, setProjectType] = useState<"Scrum" | "Kanban">("Kanban");
+  const [projectCategory, setProjectCategory] = useState<
+    "Software" | "Business"
+  >("Software");
 
   useEffect(() => {
     if (!ready) return;
@@ -69,6 +73,8 @@ export default function ModalScreen() {
       name: projectName,
       key: projectKey || projectName.substring(0, 3).toUpperCase(),
       type: projectType,
+      category: projectCategory,
+      iconUrl: projectType === "Scrum" ? "??" : "??",
       description,
     });
     router.back();
@@ -188,6 +194,19 @@ export default function ModalScreen() {
             value={description}
             onChangeText={setDescription}
           />
+          <ThemedText type="subtitle">Category</ThemedText>
+          {(["Software", "Business"] as const).map((value) => (
+            <Pressable
+              key={value}
+              onPress={() => setProjectCategory(value)}
+              style={[
+                styles.option,
+                projectCategory === value && styles.optionActive,
+              ]}
+            >
+              <ThemedText>{CATEGORY_LABELS[value]}</ThemedText>
+            </Pressable>
+          ))}
           {(["Kanban", "Scrum"] as const).map((value) => (
             <Pressable
               key={value}

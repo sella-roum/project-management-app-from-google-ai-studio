@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,28 +11,41 @@ import {
 import {
   CATEGORY_LABELS,
   DEFAULT_NOTIFICATION_SCHEME,
+  STATUS_LABELS,
   WORKFLOW_TRANSITIONS,
 } from "@repo/core";
 import type {
   AutomationLog,
   AutomationRule,
   Issue,
+  IssueStatus,
+  ProjectStats,
   Project,
+  Sprint,
   Version,
 } from "@repo/core";
 import {
   createAutomationRule,
+  createIssue,
   createVersion,
   deleteProject,
   getAutomationRules,
   getAutomationLogs,
+  getCurrentUserId,
   getIssues,
   getProjectById,
+  getProjectStats,
+  getSprints,
   getVersions,
   recordView,
+  updateIssue,
   toggleAutomationRule,
   updateAutomationRule,
+  updateIssueStatus,
   updateProject,
+  updateSprintStatus,
+  createSprint,
+  USERS,
 } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
@@ -58,8 +72,34 @@ export default function ProjectViewScreen() {
   );
   const [project, setProject] = useState<Project | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
+  const [stats, setStats] = useState<ProjectStats | null>(null);
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Summary");
+  const [boardSwimlane, setBoardSwimlane] = useState<
+    "none" | "assignee"
+  >("none");
+  const [boardFilters, setBoardFilters] = useState<Array<"mine" | "recent">>(
+    [],
+  );
+  const [inlineCreateStatus, setInlineCreateStatus] = useState<IssueStatus | null>(
+    null,
+  );
+  const [inlineCreateTitle, setInlineCreateTitle] = useState("");
+  const [activeMoveIssueId, setActiveMoveIssueId] = useState<string | null>(null);
+  const [inlineSprintId, setInlineSprintId] = useState<string | null>(null);
+  const [inlineSprintTitle, setInlineSprintTitle] = useState("");
+  const [completeSprint, setCompleteSprint] = useState<Sprint | null>(null);
+  const [completeDestination, setCompleteDestination] = useState<
+    "backlog" | "next"
+  >("backlog");
+  const [moveSprintIssueId, setMoveSprintIssueId] = useState<string | null>(null);
+  const [timelineZoom, setTimelineZoom] = useState<
+    "week" | "month" | "quarter"
+  >("month");
+  const [dueDateDrafts, setDueDateDrafts] = useState<Record<string, string>>(
+    {},
+  );
   const [projectName, setProjectName] = useState("");
   const [projectKey, setProjectKey] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -99,17 +139,21 @@ export default function ProjectViewScreen() {
 
   const reload = useCallback(async () => {
     if (!normalizedProjectId) return;
-    const [projectData, issueData, versionData, ruleData] =
+    const [projectData, issueData, sprintData, versionData, ruleData, statsData] =
       await Promise.all([
         getProjectById(normalizedProjectId),
         getIssues(normalizedProjectId),
+        getSprints(normalizedProjectId),
         getVersions(normalizedProjectId),
         getAutomationRules(normalizedProjectId),
+        getProjectStats(normalizedProjectId),
       ]);
     setProject(projectData);
     setIssues(issueData);
+    setSprints(sprintData);
     setVersions(versionData);
     setAutomationRules(ruleData.map((rule) => rule));
+    setStats(statsData);
     setProjectName(projectData?.name ?? "");
     setProjectKey(projectData?.key ?? "");
     setProjectDescription(projectData?.description ?? "");
@@ -149,6 +193,19 @@ export default function ProjectViewScreen() {
     };
     void loadLogs();
   }, [selectedRuleId]);
+
+  useEffect(() => {
+    setDueDateDrafts((prev) => {
+      const next = { ...prev };
+      issues.forEach((issue) => {
+        const value = issue.dueDate ? issue.dueDate.slice(0, 10) : "";
+        if (next[issue.id] !== value) {
+          next[issue.id] = value;
+        }
+      });
+      return next;
+    });
+  }, [issues]);
 
   const handleSaveSettings = async () => {
     if (!normalizedProjectId) return;
@@ -230,13 +287,205 @@ export default function ProjectViewScreen() {
     router.push(`/issue/${issueId}`);
   };
 
-  const groupedIssues = useMemo(() => {
-    return issues.reduce<Record<string, Issue[]>>((acc, issue) => {
-      acc[issue.status] = acc[issue.status] || [];
-      acc[issue.status].push(issue);
-      return acc;
-    }, {});
+  const toggleBoardFilter = (filter: "mine" | "recent") => {
+    setBoardFilters((prev) =>
+      prev.includes(filter)
+        ? prev.filter((item) => item !== filter)
+        : [...prev, filter],
+    );
+  };
+
+  const handleInlineCreate = async (status: IssueStatus) => {
+    if (!normalizedProjectId || !inlineCreateTitle.trim()) return;
+    await createIssue({
+      projectId: normalizedProjectId,
+      title: inlineCreateTitle.trim(),
+      status,
+      type: "Task",
+    });
+    setInlineCreateTitle("");
+    setInlineCreateStatus(null);
+    await reload();
+  };
+
+  const handleMoveIssue = async (issueId: string, status: IssueStatus) => {
+    const result = await updateIssueStatus(issueId, status);
+    if (!result) {
+      Alert.alert("ステータス変更不可", "この遷移は許可されていません。");
+      return;
+    }
+    setActiveMoveIssueId(null);
+    await reload();
+  };
+
+  const handleCreateSprint = async () => {
+    if (!normalizedProjectId) return;
+    await createSprint(normalizedProjectId);
+    await reload();
+  };
+
+  const handleStartSprint = async (sprintId: string) => {
+    await updateSprintStatus(sprintId, "active");
+    await reload();
+  };
+
+  const handleCompleteSprint = (sprint: Sprint) => {
+    setCompleteSprint(sprint);
+    setCompleteDestination("backlog");
+  };
+
+  const handleApplyCompleteSprint = async () => {
+    if (!completeSprint || !normalizedProjectId) return;
+    const incomplete = issues.filter(
+      (issue) => issue.sprintId === completeSprint.id && issue.status !== "Done",
+    );
+    let targetSprintId: string | undefined;
+    if (completeDestination === "next") {
+      const newSprint = await createSprint(normalizedProjectId);
+      targetSprintId = newSprint.id;
+    }
+    for (const issue of incomplete) {
+      await updateIssue(issue.id, { sprintId: targetSprintId });
+    }
+    await updateSprintStatus(completeSprint.id, "completed");
+    setCompleteSprint(null);
+    await reload();
+  };
+
+  const handleInlineSprintCreate = async (sprintId?: string) => {
+    if (!normalizedProjectId || !inlineSprintTitle.trim()) return;
+    await createIssue({
+      projectId: normalizedProjectId,
+      title: inlineSprintTitle.trim(),
+      sprintId,
+      status: "To Do",
+      type: "Task",
+    });
+    setInlineSprintTitle("");
+    setInlineSprintId(null);
+    await reload();
+  };
+
+  const handleMoveIssueToSprint = async (
+    issueId: string,
+    sprintId?: string,
+  ) => {
+    await updateIssue(issueId, { sprintId });
+    setMoveSprintIssueId(null);
+    await reload();
+  };
+
+  const handleDueDateChange = (issueId: string, value: string) => {
+    setDueDateDrafts((prev) => ({ ...prev, [issueId]: value }));
+  };
+
+  const handleDueDateSave = async (issue: Issue) => {
+    const value = dueDateDrafts[issue.id] ?? "";
+    if (!value) {
+      await updateIssue(issue.id, { dueDate: undefined });
+      await reload();
+      return;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      Alert.alert("日付形式エラー", "YYYY-MM-DD 形式で入力してください。");
+      return;
+    }
+    await updateIssue(issue.id, { dueDate: date.toISOString() });
+    await reload();
+  };
+
+  const currentUserId = getCurrentUserId();
+  const boardStatuses: IssueStatus[] = [
+    "To Do",
+    "In Progress",
+    "In Review",
+    "Done",
+  ];
+
+  const filteredIssues = useMemo(() => {
+    let result = [...issues];
+    if (boardFilters.includes("mine")) {
+      result = result.filter((issue) => issue.assigneeId === currentUserId);
+    }
+    if (boardFilters.includes("recent")) {
+      const dayAgo = new Date(Date.now() - 86400000).toISOString();
+      result = result.filter((issue) => issue.updatedAt > dayAgo);
+    }
+    return result;
+  }, [issues, boardFilters, currentUserId]);
+
+  const swimlanes = useMemo(() => {
+    if (boardSwimlane === "none") {
+      return [{ id: "all", name: "すべての課題" }];
+    }
+    const assigneeIds = new Set(
+      filteredIssues.map((issue) => issue.assigneeId).filter(Boolean),
+    );
+    const activeUsers = USERS.filter((user) => assigneeIds.has(user.id));
+    return [
+      ...activeUsers.map((user) => ({ id: user.id, name: user.name })),
+      { id: "unassigned", name: "未割り当て" },
+    ];
+  }, [boardSwimlane, filteredIssues]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.keys(STATUS_LABELS).forEach((status) => {
+      counts[status] = 0;
+    });
+    issues.forEach((issue) => {
+      counts[issue.status] = (counts[issue.status] || 0) + 1;
+    });
+    return counts;
   }, [issues]);
+
+  const activeSprints = useMemo(
+    () => sprints.filter((sprint) => sprint.status === "active"),
+    [sprints],
+  );
+  const futureSprints = useMemo(
+    () =>
+      sprints.filter(
+        (sprint) =>
+          sprint.status === "future" && !sprint.name.includes("バックログ"),
+      ),
+    [sprints],
+  );
+  const backlogSprint = useMemo(() => {
+    const existing = sprints.find((sprint) =>
+      sprint.name.includes("バックログ"),
+    );
+    if (existing) return existing;
+    return {
+      id: "backlog",
+      name: "バックログ",
+      status: "future",
+      projectId: normalizedProjectId ?? "",
+    } as Sprint;
+  }, [sprints, normalizedProjectId]);
+
+  const timelineConfig = useMemo(() => {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (timelineZoom === "week") {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 28);
+    } else if (timelineZoom === "quarter") {
+      start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 9, 0);
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 4, 0);
+    }
+
+    const totalDays =
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+
+    return { start, end, totalDays };
+  }, [timelineZoom]);
 
   const notificationLabels = useMemo(
     () => ({
@@ -287,56 +536,498 @@ export default function ProjectViewScreen() {
           </ScrollView>
 
           {activeTab === "Summary" ? (
-            <ThemedView style={styles.card}>
-              <ThemedText type="defaultSemiBold">Summary</ThemedText>
-              <ThemedText>{issues.length} issues</ThemedText>
-              <ThemedText>{versions.length} versions</ThemedText>
+            <ThemedView style={styles.section}>
+              <ThemedView style={styles.statsRow}>
+                <ThemedView style={styles.statCard}>
+                  <ThemedText type="defaultSemiBold">
+                    {issues.filter((i) => i.status !== "Done").length}
+                  </ThemedText>
+                  <ThemedText style={styles.metaText}>未完了</ThemedText>
+                </ThemedView>
+                <ThemedView style={styles.statCard}>
+                  <ThemedText type="defaultSemiBold">
+                    {statusCounts["Done"] || 0}
+                  </ThemedText>
+                  <ThemedText style={styles.metaText}>完了</ThemedText>
+                </ThemedView>
+              </ThemedView>
+              <ThemedView style={styles.card}>
+                <ThemedText type="subtitle">サマリー</ThemedText>
+                <ThemedText>{issues.length} issues</ThemedText>
+                <ThemedText>{versions.length} versions</ThemedText>
+              </ThemedView>
+              {stats && stats.workload.length > 0 ? (
+                <ThemedView style={styles.card}>
+                  <ThemedText type="subtitle">ワークロード</ThemedText>
+                  {stats.workload.map((item) => (
+                    <ThemedView key={item.userName} style={styles.rowBetween}>
+                      <ThemedText>{item.userName}</ThemedText>
+                      <ThemedText>{item.count}</ThemedText>
+                    </ThemedView>
+                  ))}
+                </ThemedView>
+              ) : null}
+              {stats && stats.epicProgress.length > 0 ? (
+                <ThemedView style={styles.card}>
+                  <ThemedText type="subtitle">エピック進捗</ThemedText>
+                  {stats.epicProgress.map((epic) => (
+                    <ThemedView key={epic.id} style={styles.rowBetween}>
+                      <ThemedText numberOfLines={1}>{epic.title}</ThemedText>
+                      <ThemedText>{epic.percent}%</ThemedText>
+                    </ThemedView>
+                  ))}
+                </ThemedView>
+              ) : null}
+              <ThemedView style={styles.card}>
+                <ThemedText type="subtitle">ステータス合計</ThemedText>
+                {Object.keys(STATUS_LABELS).map((status) => (
+                  <ThemedView key={status} style={styles.rowBetween}>
+                    <ThemedText>{STATUS_LABELS[status]}</ThemedText>
+                    <ThemedText>{statusCounts[status] || 0}</ThemedText>
+                  </ThemedView>
+                ))}
+              </ThemedView>
             </ThemedView>
           ) : null}
 
           {activeTab === "Board" ? (
             <ThemedView style={styles.section}>
-              {Object.entries(groupedIssues).map(([status, items]) => (
-                <ThemedView key={status} style={styles.card}>
-                  <ThemedText type="defaultSemiBold">{status}</ThemedText>
-                  {items.map((issue) => (
-                    <Pressable
-                      key={issue.id}
-                      onPress={() => handleOpenIssue(issue.id)}
-                      style={styles.issueRow}
-                    >
-                      <ThemedText type="defaultSemiBold">
-                        {issue.key}
-                      </ThemedText>
-                      <ThemedText>{issue.title}</ThemedText>
-                    </Pressable>
-                  ))}
+              <ThemedView style={styles.boardControls}>
+                <ThemedView style={styles.row}>
+                  <Pressable
+                    onPress={() => setBoardSwimlane("none")}
+                    style={[
+                      styles.boardToggle,
+                      boardSwimlane === "none" && styles.boardToggleActive,
+                    ]}
+                  >
+                    <ThemedText>スタンダード</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setBoardSwimlane("assignee")}
+                    style={[
+                      styles.boardToggle,
+                      boardSwimlane === "assignee" && styles.boardToggleActive,
+                    ]}
+                  >
+                    <ThemedText>担当者別</ThemedText>
+                  </Pressable>
                 </ThemedView>
-              ))}
+                <ThemedView style={styles.rowWrap}>
+                  <Pressable
+                    onPress={() => toggleBoardFilter("mine")}
+                    style={[
+                      styles.filterChip,
+                      boardFilters.includes("mine") && styles.filterChipActive,
+                    ]}
+                  >
+                    <ThemedText>自分の課題</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => toggleBoardFilter("recent")}
+                    style={[
+                      styles.filterChip,
+                      boardFilters.includes("recent") && styles.filterChipActive,
+                    ]}
+                  >
+                    <ThemedText>最近更新</ThemedText>
+                  </Pressable>
+                </ThemedView>
+              </ThemedView>
+              {boardStatuses.map((status) => {
+                const columnIssues = filteredIssues.filter(
+                  (issue) => issue.status === status,
+                );
+                const limit = project?.columnSettings?.[status]?.limit;
+                const isOverLimit = Boolean(limit && columnIssues.length > limit);
+
+                const renderIssue = (issue: Issue) => {
+                  const assigneeName =
+                    USERS.find((user) => user.id === issue.assigneeId)?.name ||
+                    "未割り当て";
+                  const allowed = workflowSettings[issue.status] ?? [];
+                  return (
+                    <ThemedView key={issue.id} style={styles.issueCard}>
+                      <Pressable
+                        onPress={() => handleOpenIssue(issue.id)}
+                        style={styles.issueRow}
+                      >
+                        <ThemedText type="defaultSemiBold">
+                          {issue.key}
+                        </ThemedText>
+                        <ThemedText>{issue.title}</ThemedText>
+                      </Pressable>
+                      <ThemedView style={styles.rowBetween}>
+                        <ThemedText style={styles.metaText}>
+                          {assigneeName}
+                        </ThemedText>
+                        <Pressable
+                          onPress={() =>
+                            setActiveMoveIssueId(
+                              activeMoveIssueId === issue.id
+                                ? null
+                                : issue.id,
+                            )
+                          }
+                          style={styles.ghostBtnSmall}
+                        >
+                          <ThemedText>移動</ThemedText>
+                        </Pressable>
+                      </ThemedView>
+                      {activeMoveIssueId === issue.id && allowed.length > 0 ? (
+                        <ThemedView style={styles.rowWrap}>
+                          {allowed.map((next) => (
+                            <Pressable
+                              key={next}
+                              onPress={() => handleMoveIssue(issue.id, next)}
+                              style={styles.actionChip}
+                            >
+                              <ThemedText>{STATUS_LABELS[next]}</ThemedText>
+                            </Pressable>
+                          ))}
+                        </ThemedView>
+                      ) : null}
+                    </ThemedView>
+                  );
+                };
+
+                return (
+                  <ThemedView key={status} style={styles.card}>
+                    <ThemedView style={styles.rowBetween}>
+                      <ThemedText type="defaultSemiBold">
+                        {STATUS_LABELS[status]}
+                      </ThemedText>
+                      <ThemedText
+                        style={[
+                          styles.metaText,
+                          isOverLimit && styles.overLimitText,
+                        ]}
+                      >
+                        {columnIssues.length}
+                        {limit ? ` / ${limit}` : ""}
+                      </ThemedText>
+                    </ThemedView>
+
+                    {boardSwimlane === "assignee" ? (
+                      swimlanes.map((lane) => {
+                        const laneIssues =
+                          lane.id === "unassigned"
+                            ? columnIssues.filter((i) => !i.assigneeId)
+                            : lane.id === "all"
+                              ? columnIssues
+                              : columnIssues.filter(
+                                  (i) => i.assigneeId === lane.id,
+                                );
+                        if (laneIssues.length === 0) return null;
+                        return (
+                          <ThemedView
+                            key={`${status}-${lane.id}`}
+                            style={styles.section}
+                          >
+                            <ThemedText style={styles.metaText}>
+                              {lane.name} ({laneIssues.length})
+                            </ThemedText>
+                            {laneIssues.map(renderIssue)}
+                          </ThemedView>
+                        );
+                      })
+                    ) : columnIssues.length === 0 ? (
+                      <ThemedText style={styles.metaText}>
+                        課題はありません。
+                      </ThemedText>
+                    ) : (
+                      columnIssues.map(renderIssue)
+                    )}
+
+                    {status === "To Do" ? (
+                      inlineCreateStatus === status ? (
+                        <ThemedView style={styles.inlineCreate}>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="課題タイトル"
+                            value={inlineCreateTitle}
+                            onChangeText={setInlineCreateTitle}
+                          />
+                          <ThemedView style={styles.row}>
+                            <Pressable
+                              onPress={() => handleInlineCreate(status)}
+                              style={styles.primaryBtn}
+                            >
+                              <ThemedText type="link">作成</ThemedText>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => {
+                                setInlineCreateStatus(null);
+                                setInlineCreateTitle("");
+                              }}
+                              style={styles.secondaryBtn}
+                            >
+                              <ThemedText>キャンセル</ThemedText>
+                            </Pressable>
+                          </ThemedView>
+                        </ThemedView>
+                      ) : (
+                        <Pressable
+                          onPress={() => setInlineCreateStatus(status)}
+                          style={styles.ghostBtn}
+                        >
+                          <ThemedText>課題を追加</ThemedText>
+                        </Pressable>
+                      )
+                    ) : null}
+                  </ThemedView>
+                );
+              })}
             </ThemedView>
           ) : null}
 
           {activeTab === "Backlog" ? (
             <ThemedView style={styles.section}>
-              {issues.map((issue) => (
-                <Pressable
-                  key={issue.id}
-                  onPress={() => handleOpenIssue(issue.id)}
-                  style={styles.card}
-                >
-                  <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
-                  <ThemedText>{issue.title}</ThemedText>
+              <ThemedView style={styles.rowBetween}>
+                <ThemedText type="subtitle">Backlog</ThemedText>
+                <Pressable onPress={handleCreateSprint} style={styles.primaryBtn}>
+                  <ThemedText type="link">スプリントを作成</ThemedText>
                 </Pressable>
-              ))}
+              </ThemedView>
+              {[...activeSprints, ...futureSprints, backlogSprint].map(
+                (sprint) => {
+                  const isBacklog =
+                    sprint.id === backlogSprint.id ||
+                    sprint.name.includes("バックログ");
+                  const sprintIssues = issues.filter((issue) =>
+                    isBacklog
+                      ? !issue.sprintId || issue.sprintId === sprint.id
+                      : issue.sprintId === sprint.id,
+                  );
+                  const backlogTargetId =
+                    backlogSprint.id === "backlog"
+                      ? undefined
+                      : backlogSprint.id;
+                  return (
+                    <ThemedView key={sprint.id} style={styles.card}>
+                      <ThemedView style={styles.rowBetween}>
+                        <ThemedText type="defaultSemiBold">
+                          {sprint.name}
+                        </ThemedText>
+                        <ThemedView style={styles.rowWrap}>
+                          {!isBacklog && sprint.status === "future" ? (
+                            <Pressable
+                              onPress={() => handleStartSprint(sprint.id)}
+                              style={styles.secondaryBtn}
+                            >
+                              <ThemedText>開始</ThemedText>
+                            </Pressable>
+                          ) : null}
+                          {!isBacklog && sprint.status === "active" ? (
+                            <Pressable
+                              onPress={() => handleCompleteSprint(sprint)}
+                              style={styles.primaryBtn}
+                            >
+                              <ThemedText type="link">完了</ThemedText>
+                            </Pressable>
+                          ) : null}
+                          <ThemedText style={styles.metaText}>
+                            {sprintIssues.length}
+                          </ThemedText>
+                        </ThemedView>
+                      </ThemedView>
+
+                      {sprintIssues.length === 0 ? (
+                        <ThemedText style={styles.metaText}>
+                          課題はありません。
+                        </ThemedText>
+                      ) : (
+                        sprintIssues.map((issue) => (
+                          <ThemedView key={issue.id} style={styles.issueCard}>
+                            <Pressable
+                              onPress={() => handleOpenIssue(issue.id)}
+                              style={styles.issueRow}
+                            >
+                              <ThemedText type="defaultSemiBold">
+                                {issue.key}
+                              </ThemedText>
+                              <ThemedText>{issue.title}</ThemedText>
+                            </Pressable>
+                            <ThemedView style={styles.rowBetween}>
+                              <ThemedText style={styles.metaText}>
+                                {STATUS_LABELS[issue.status]}
+                              </ThemedText>
+                              <Pressable
+                                onPress={() =>
+                                  setMoveSprintIssueId(
+                                    moveSprintIssueId === issue.id
+                                      ? null
+                                      : issue.id,
+                                  )
+                                }
+                                style={styles.ghostBtnSmall}
+                              >
+                                <ThemedText>移動</ThemedText>
+                              </Pressable>
+                            </ThemedView>
+                            {moveSprintIssueId === issue.id ? (
+                              <ThemedView style={styles.rowWrap}>
+                                <Pressable
+                                  onPress={() =>
+                                    handleMoveIssueToSprint(
+                                      issue.id,
+                                      backlogTargetId,
+                                    )
+                                  }
+                                  style={styles.actionChip}
+                                >
+                                  <ThemedText>バックログ</ThemedText>
+                                </Pressable>
+                                {[...activeSprints, ...futureSprints].map(
+                                  (target) => (
+                                    <Pressable
+                                      key={target.id}
+                                      onPress={() =>
+                                        handleMoveIssueToSprint(
+                                          issue.id,
+                                          target.id,
+                                        )
+                                      }
+                                      style={styles.actionChip}
+                                    >
+                                      <ThemedText>{target.name}</ThemedText>
+                                    </Pressable>
+                                  ),
+                                )}
+                              </ThemedView>
+                            ) : null}
+                          </ThemedView>
+                        ))
+                      )}
+
+                      {inlineSprintId === sprint.id ? (
+                        <ThemedView style={styles.inlineCreate}>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="課題タイトル"
+                            value={inlineSprintTitle}
+                            onChangeText={setInlineSprintTitle}
+                          />
+                          <ThemedView style={styles.row}>
+                            <Pressable
+                              onPress={() =>
+                                handleInlineSprintCreate(
+                                  isBacklog ? backlogTargetId : sprint.id,
+                                )
+                              }
+                              style={styles.primaryBtn}
+                            >
+                              <ThemedText type="link">作成</ThemedText>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => {
+                                setInlineSprintId(null);
+                                setInlineSprintTitle("");
+                              }}
+                              style={styles.secondaryBtn}
+                            >
+                              <ThemedText>キャンセル</ThemedText>
+                            </Pressable>
+                          </ThemedView>
+                        </ThemedView>
+                      ) : (
+                        <Pressable
+                          onPress={() => setInlineSprintId(sprint.id)}
+                          style={styles.ghostBtn}
+                        >
+                          <ThemedText>課題を追加</ThemedText>
+                        </Pressable>
+                      )}
+                    </ThemedView>
+                  );
+                },
+              )}
             </ThemedView>
           ) : null}
 
           {activeTab === "Timeline" ? (
-            <ThemedView style={styles.card}>
-              <ThemedText type="defaultSemiBold">Timeline</ThemedText>
-              <ThemedText>
-                スプリントや期限情報は今後のアップデートで追加されます。
+            <ThemedView style={styles.section}>
+              <ThemedView style={styles.row}>
+                {(["week", "month", "quarter"] as const).map((zoom) => (
+                  <Pressable
+                    key={zoom}
+                    onPress={() => setTimelineZoom(zoom)}
+                    style={[
+                      styles.boardToggle,
+                      timelineZoom === zoom && styles.boardToggleActive,
+                    ]}
+                  >
+                    <ThemedText>
+                      {zoom === "week"
+                        ? "週"
+                        : zoom === "month"
+                          ? "月"
+                          : "四半期"}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </ThemedView>
+              <ThemedText style={styles.metaText}>
+                {timelineConfig.start.toLocaleDateString()} -{" "}
+                {timelineConfig.end.toLocaleDateString()}
               </ThemedText>
+              {issues
+                .slice()
+                .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                .map((issue) => {
+                  const startDate = new Date(issue.createdAt);
+                  const endDate = issue.dueDate
+                    ? new Date(issue.dueDate)
+                    : new Date(startDate.getTime() + 7 * 86400000);
+                  const totalDays = timelineConfig.totalDays || 1;
+                  const startDays =
+                    (startDate.getTime() - timelineConfig.start.getTime()) /
+                    86400000;
+                  const endDays =
+                    (endDate.getTime() - timelineConfig.start.getTime()) /
+                    86400000;
+                  const leftPercent = Math.max(
+                    0,
+                    Math.min(100, (startDays / totalDays) * 100),
+                  );
+                  const widthPercent = Math.max(
+                    5,
+                    ((endDays - startDays) / totalDays) * 100,
+                  );
+
+                  return (
+                    <ThemedView key={issue.id} style={styles.timelineRow}>
+                      <Pressable onPress={() => handleOpenIssue(issue.id)}>
+                        <ThemedText type="defaultSemiBold">
+                          {issue.key}
+                        </ThemedText>
+                        <ThemedText numberOfLines={1}>
+                          {issue.title}
+                        </ThemedText>
+                      </Pressable>
+                      <ThemedView style={styles.timelineTrack}>
+                        <ThemedView
+                          style={[
+                            styles.timelineBar,
+                            {
+                              left: `${leftPercent}%`,
+                              width: `${widthPercent}%`,
+                            },
+                          ]}
+                        />
+                      </ThemedView>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="YYYY-MM-DD"
+                        value={dueDateDrafts[issue.id] ?? ""}
+                        onChangeText={(value) =>
+                          handleDueDateChange(issue.id, value)
+                        }
+                        onBlur={() => handleDueDateSave(issue)}
+                      />
+                    </ThemedView>
+                  );
+                })}
             </ThemedView>
           ) : null}
 
@@ -599,6 +1290,51 @@ export default function ProjectViewScreen() {
         <ThemedText>Project not found.</ThemedText>
       )}
 
+      {completeSprint ? (
+        <ThemedView style={styles.overlay}>
+          <ThemedView style={styles.modalCard}>
+            <ThemedText type="subtitle">
+              スプリント完了: {completeSprint.name}
+            </ThemedText>
+            <ThemedText>
+              未完了の課題をどこへ移動しますか？
+            </ThemedText>
+            <Pressable
+              onPress={() => setCompleteDestination("backlog")}
+              style={[
+                styles.option,
+                completeDestination === "backlog" && styles.optionActive,
+              ]}
+            >
+              <ThemedText>バックログ</ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setCompleteDestination("next")}
+              style={[
+                styles.option,
+                completeDestination === "next" && styles.optionActive,
+              ]}
+            >
+              <ThemedText>次のスプリントへ</ThemedText>
+            </Pressable>
+            <ThemedView style={styles.rowBetween}>
+              <Pressable
+                onPress={() => setCompleteSprint(null)}
+                style={styles.secondaryBtn}
+              >
+                <ThemedText>キャンセル</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleApplyCompleteSprint}
+                style={styles.primaryBtn}
+              >
+                <ThemedText type="link">完了</ThemedText>
+              </Pressable>
+            </ThemedView>
+          </ThemedView>
+        </ThemedView>
+      ) : null}
+
       {showAutomationForm ? (
         <ThemedView style={styles.overlay}>
           <ThemedView style={styles.modalCard}>
@@ -673,6 +1409,26 @@ export default function ProjectViewScreen() {
 }
 
 const styles = StyleSheet.create({
+  actionChip: {
+    borderColor: "#e5e7eb",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  boardControls: {
+    gap: 12,
+  },
+  boardToggle: {
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  boardToggleActive: {
+    borderColor: "#2563eb",
+  },
   card: {
     borderRadius: 12,
     gap: 6,
@@ -707,6 +1463,24 @@ const styles = StyleSheet.create({
   fieldGroup: {
     gap: 6,
   },
+  filterChip: {
+    borderColor: "#e5e7eb",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  filterChipActive: {
+    borderColor: "#2563eb",
+  },
+  ghostBtnSmall: {
+    alignItems: "center",
+    borderColor: "#d1d5db",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   helperText: {
     color: "#6b7280",
     fontSize: 12,
@@ -723,6 +1497,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  inlineCreate: {
+    gap: 8,
+  },
+  issueCard: {
+    borderRadius: 12,
+    gap: 8,
+    padding: 12,
+  },
   issueRow: {
     gap: 4,
   },
@@ -732,6 +1514,13 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 20,
     width: "100%",
+  },
+  metaText: {
+    color: "#6b7280",
+    fontSize: 12,
+  },
+  overLimitText: {
+    color: "#dc2626",
   },
   option: {
     borderColor: "#e5e7eb",
@@ -801,5 +1590,33 @@ const styles = StyleSheet.create({
   },
   settingsGroup: {
     gap: 12,
+  },
+  statCard: {
+    borderRadius: 12,
+    flex: 1,
+    gap: 4,
+    padding: 16,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  timelineBar: {
+    backgroundColor: "#2563eb",
+    borderRadius: 999,
+    height: 8,
+    position: "absolute",
+    top: 6,
+  },
+  timelineRow: {
+    borderRadius: 12,
+    gap: 8,
+    padding: 12,
+  },
+  timelineTrack: {
+    backgroundColor: "#e5e7eb",
+    borderRadius: 999,
+    height: 20,
+    position: "relative",
   },
 });

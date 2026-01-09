@@ -1,6 +1,7 @@
 import * as SQLite from "expo-sqlite";
 
 import type {
+  Attachment,
   AutomationLog,
   AutomationRule,
   Issue,
@@ -26,6 +27,7 @@ import {
   getSeedUsers,
   selectRecentIssues,
   sortAutomationLogsByExecutedAt,
+  STATUS_LABELS,
   WORKFLOW_TRANSITIONS,
 } from "@repo/core";
 import type {
@@ -56,8 +58,8 @@ type SQLiteRow = {
   executedAt?: string;
 };
 
-const noopUnsubscribe: Unsubscribe = () => undefined;
 const SEED_USERS: User[] = getSeedUsers();
+const DEFAULT_POLL_INTERVAL_MS = 1000;
 
 export class SQLiteStorageAdapter implements AppStorage {
   private dbPromise: Promise<SQLite.SQLiteDatabase>;
@@ -244,22 +246,56 @@ export class SQLiteStorageAdapter implements AppStorage {
     return this.parseRow<T>(row);
   }
 
-  private async watchAll<T>(
+  private serializeWatchValue(value: unknown) {
+    return JSON.stringify(value);
+  }
+
+  private async startPolling<T>(
+    fetch: () => Promise<T>,
+    listener: (value: T) => void,
+    intervalMs = DEFAULT_POLL_INTERVAL_MS,
+  ): Promise<Unsubscribe> {
+    let active = true;
+    let lastSerialized = "";
+
+    const runOnce = async () => {
+      try {
+        const value = await fetch();
+        const serialized = this.serializeWatchValue(value);
+        if (serialized !== lastSerialized) {
+          lastSerialized = serialized;
+          listener(value);
+        }
+      } catch (error) {
+        console.error("Storage polling error:", error);
+      }
+    };
+
+    await runOnce();
+
+    const intervalId = setInterval(() => {
+      if (!active) return;
+      void runOnce();
+    }, intervalMs);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }
+
+  private watchAll<T>(
     list: () => Promise<T[]>,
     listener: (rows: T[]) => void,
   ): Promise<Unsubscribe> {
-    const rows = await list();
-    listener(rows);
-    return noopUnsubscribe;
+    return this.startPolling(list, listener);
   }
 
-  private async watchById<T>(
+  private watchById<T>(
     fetch: () => Promise<T | null>,
     listener: (row: T | null) => void,
   ): Promise<Unsubscribe> {
-    const row = await fetch();
-    listener(row);
-    return noopUnsubscribe;
+    return this.startPolling(fetch, listener);
   }
 
   private listProjectsInternal = async (): Promise<Project[]> =>
@@ -357,6 +393,9 @@ export class SQLiteStorageAdapter implements AppStorage {
       assigneeId: input.assigneeId,
       reporterId: input.reporterId ?? currentUserId,
       sprintId: input.sprintId,
+      fixVersionId: input.fixVersionId,
+      dueDate: input.dueDate,
+      storyPoints: input.storyPoints,
       labels: input.labels ?? [],
       comments: input.comments ?? [],
       workLogs: input.workLogs ?? [],
@@ -372,7 +411,8 @@ export class SQLiteStorageAdapter implements AppStorage {
       ],
       links: input.links ?? [],
       attachments: input.attachments ?? [],
-      watcherIds: input.watcherIds ?? [],
+      parentId: input.parentId,
+      watcherIds: input.watcherIds ?? [currentUserId],
       createdAt: input.createdAt ?? nowIso,
       updatedAt: input.updatedAt ?? nowIso,
     };
@@ -380,6 +420,18 @@ export class SQLiteStorageAdapter implements AppStorage {
       "INSERT OR REPLACE INTO issues (id, projectId, data) VALUES (?, ?, ?)",
       [issue.id, issue.projectId, JSON.stringify(issue)],
     );
+    await this.dispatchProjectNotification(
+      issue.projectId,
+      "issue_created",
+      issue,
+    );
+    if (issue.assigneeId && issue.assigneeId !== currentUserId) {
+      await this.dispatchProjectNotification(
+        issue.projectId,
+        "issue_assigned",
+        issue,
+      );
+    }
     await this.runAutomation("issue_created", issue);
     return issue;
   };
@@ -387,20 +439,85 @@ export class SQLiteStorageAdapter implements AppStorage {
   private updateIssueInternal = async (
     id: ID,
     patch: Partial<Issue>,
-  ): Promise<Issue> => {
+  ): Promise<Issue | false> => {
     const existing = await this.getIssueByIdInternal(id);
     if (!existing) {
       throw new Error(`Issue not found: ${id}`);
     }
-    const updated = { ...existing, ...patch, updatedAt: new Date().toISOString() };
+
+    if (patch.status && patch.status !== existing.status) {
+      const project = await this.getProjectByIdInternal(existing.projectId);
+      const workflow = project?.workflowSettings || WORKFLOW_TRANSITIONS;
+      const allowed = workflow[existing.status] || [];
+      if (!allowed.includes(patch.status)) {
+        return false;
+      }
+    }
+
+    const currentUserId = this.getCurrentUserId();
+    const historyEntries: Array<{
+      id: string;
+      authorId: string;
+      field: string;
+      from: unknown;
+      to: unknown;
+      createdAt: string;
+    }> = [];
+    const nowIso = new Date().toISOString();
+
+    for (const [key, value] of Object.entries(patch)) {
+      if ((existing as any)[key] !== value) {
+        historyEntries.push({
+          id: `h-${Date.now()}-${key}`,
+          authorId: currentUserId,
+          field: key,
+          from: (existing as any)[key],
+          to: value,
+          createdAt: nowIso,
+        });
+      }
+    }
+
+    const updated: Issue = {
+      ...existing,
+      ...patch,
+      updatedAt: nowIso,
+      history: [...(existing.history || []), ...historyEntries],
+    };
+
     const db = await this.getDb();
     await db.runAsync(
       "UPDATE issues SET data = ?, projectId = ? WHERE id = ?",
       [JSON.stringify(updated), updated.projectId, id],
     );
+
+    for (const [key, value] of Object.entries(patch)) {
+      if ((existing as any)[key] === value) continue;
+      if (key === "assigneeId" && value && value !== currentUserId) {
+        await this.dispatchProjectNotification(
+          existing.projectId,
+          "issue_assigned",
+          existing,
+        );
+      }
+      if (key === "status") {
+        const event = value === "Done" ? "issue_resolved" : "status_changed";
+        const updatedObj = {
+          ...existing,
+          status: value as IssueStatus,
+        };
+        await this.dispatchProjectNotification(
+          existing.projectId,
+          event,
+          updatedObj as Issue,
+        );
+      }
+    }
+
     if (patch.status && patch.status !== existing.status) {
       await this.runAutomation("status_changed", updated);
     }
+
     return updated;
   };
 
@@ -512,6 +629,89 @@ export class SQLiteStorageAdapter implements AppStorage {
     listener: (row: Notification | null) => void,
   ) => this.watchById(() => this.getNotificationByIdInternal(id), listener);
 
+  private async updateIssueRow(issue: Issue): Promise<void> {
+    const db = await this.getDb();
+    await db.runAsync(
+      "UPDATE issues SET data = ?, projectId = ? WHERE id = ?",
+      [JSON.stringify(issue), issue.projectId, issue.id],
+    );
+  }
+
+  private async createNotificationInternal(
+    notification: Partial<Notification> & { issueId?: string },
+  ): Promise<void> {
+    const db = await this.getDb();
+    const createdAt = new Date().toISOString();
+    const data: Notification = {
+      id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title: notification.title || "システム通知",
+      description: notification.description || "",
+      read: false,
+      createdAt,
+      type: notification.type || "system",
+      issueId: notification.issueId,
+    };
+    await db.runAsync(
+      "INSERT OR REPLACE INTO notifications (id, read, data) VALUES (?, ?, ?)",
+      [data.id, data.read ? 1 : 0, JSON.stringify(data)],
+    );
+  }
+
+  private async dispatchProjectNotification(
+    projectId: string,
+    event: string,
+    issue: Issue,
+  ) {
+    const project = await this.getProjectByIdInternal(projectId);
+    const scheme = project?.notificationSettings || DEFAULT_NOTIFICATION_SCHEME;
+    const recipients = scheme[event] || [];
+    const currentUserId = this.getCurrentUserId();
+
+    const targetUserIds = new Set<string>();
+    if (recipients.includes("Reporter") && issue.reporterId) {
+      targetUserIds.add(issue.reporterId);
+    }
+    if (recipients.includes("Assignee") && issue.assigneeId) {
+      targetUserIds.add(issue.assigneeId);
+    }
+    if (recipients.includes("Watcher")) {
+      (issue.watcherIds || []).forEach((id) => targetUserIds.add(id));
+    }
+
+    if (targetUserIds.has(currentUserId)) {
+      targetUserIds.delete(currentUserId);
+    }
+
+    let title = "通知";
+    let description = issue.title;
+
+    if (event === "issue_created") {
+      title = `新しい課題が作成されました: ${issue.key}`;
+    }
+    if (event === "issue_assigned") {
+      title = `課題があなたに割り当てられました: ${issue.key}`;
+    }
+    if (event === "status_changed") {
+      title = `課題のステータスが「${STATUS_LABELS[issue.status]}」に変更されました`;
+    }
+    if (event === "comment_added") {
+      title = `新しいコメントが追加されました: ${issue.key}`;
+    }
+    if (event === "issue_resolved") {
+      title = `課題が解決されました: ${issue.key}`;
+    }
+
+    for (const _userId of targetUserIds) {
+      void _userId;
+      await this.createNotificationInternal({
+        title,
+        description,
+        type: event === "comment_added" ? "mention" : "system",
+        issueId: issue.id,
+      });
+    }
+  }
+
   getCurrentUserId = (): string => this.currentUserId;
 
   clearDatabase = async (): Promise<void> => {
@@ -609,10 +809,14 @@ export class SQLiteStorageAdapter implements AppStorage {
     this.removeProjectInternal(id);
 
   hasPermission = (
-    _userId: string,
-    _action: string,
+    userId: string,
+    action: string,
     _project?: Project,
-  ): boolean => true;
+  ): boolean => {
+    if (userId === "u1") return true;
+    if (action === "manage_project") return userId === "u2";
+    return true;
+  };
 
   getNotifications = async (): Promise<Notification[]> => {
     const notifications = await this.listNotificationsInternal();
@@ -647,21 +851,74 @@ export class SQLiteStorageAdapter implements AppStorage {
   updateIssue = async (
     id: string,
     updates: Partial<Issue>,
-  ): Promise<Issue> => this.updateIssueInternal(id, updates);
+  ): Promise<Issue | false> => this.updateIssueInternal(id, updates);
 
   getIssuesForUser = async (userId: string): Promise<Issue[]> => {
     const issues = await this.queryAll<Issue>("SELECT data FROM issues");
     return issues.filter((issue) => issue.assigneeId === userId);
   };
 
-  updateIssueStatus = async (id: string, status: IssueStatus) =>
-    this.updateIssueInternal(id, { status });
+  updateIssueStatus = async (id: string, status: IssueStatus) => {
+    const result = await this.updateIssueInternal(id, { status });
+    if (result === false) return undefined;
+    return result;
+  };
 
   deleteIssue = async (id: string): Promise<void> =>
-    this.removeIssueInternal(id);
+    this.deleteIssueInternal(id);
 
-  addAttachment = async (_issueId: string, _file: File): Promise<void> =>
-    undefined;
+  private deleteIssueInternal = async (id: ID): Promise<void> => {
+    const issue = await this.getIssueByIdInternal(id);
+    if (!issue) return;
+    const currentUserId = this.getCurrentUserId();
+    if (!this.hasPermission(currentUserId, "delete_issue")) return;
+    await this.removeIssueInternal(id);
+  };
+
+  addAttachment = async (issueId: string, file: File): Promise<void> => {
+    const issue = await this.getIssueByIdInternal(issueId);
+    if (!issue) return;
+
+    const addAttachmentData = async (data: string) => {
+      const newAttachment: Attachment = {
+        id: `at-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        fileName: (file as any).name || "attachment",
+        fileType: (file as any).type || "application/octet-stream",
+        fileSize: (file as any).size || 0,
+        data,
+        createdAt: new Date().toISOString(),
+      };
+      const attachments = [...(issue.attachments || []), newAttachment];
+      const updated: Issue = {
+        ...issue,
+        attachments,
+        updatedAt: new Date().toISOString(),
+      };
+      await this.updateIssueRow(updated);
+    };
+
+    if (typeof FileReader === "undefined") {
+      const uri = (file as any).uri;
+      if (typeof uri === "string") {
+        await addAttachmentData(uri);
+      }
+      return;
+    }
+
+    const reader = new FileReader();
+    await new Promise<void>((resolve, reject) => {
+      reader.onload = async () => {
+        try {
+          await addAttachmentData(reader.result as string);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error("File upload failed"));
+      reader.readAsDataURL(file);
+    });
+  };
 
   addComment = async (id: string, text: string) => {
     const issue = await this.getIssueByIdInternal(id);
@@ -675,17 +932,39 @@ export class SQLiteStorageAdapter implements AppStorage {
         createdAt: new Date().toISOString(),
       },
     ];
-    const updated = await this.updateIssueInternal(id, { comments });
-    await this.runAutomation("comment_added", updated);
+    const updated: Issue = {
+      ...issue,
+      comments,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.updateIssueRow(updated);
+    await this.dispatchProjectNotification(
+      issue.projectId,
+      "comment_added",
+      issue,
+    );
+    await this.runAutomation("comment_added", issue);
   };
 
-  addIssueLink = async (
-    _issueId: string,
-    _targetId: string,
-    _type: LinkType,
-  ) => undefined;
+  addIssueLink = async (issueId: string, targetId: string, type: LinkType) => {
+    const issue = await this.getIssueByIdInternal(issueId);
+    if (!issue) return;
+    const links = [
+      ...(issue.links ?? []),
+      { id: `l-${Date.now()}`, type, outwardIssueId: targetId },
+    ];
+    const updated: Issue = {
+      ...issue,
+      links,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.updateIssueRow(updated);
+  };
 
-  getSubtasks = async (_parentId: string): Promise<Issue[]> => [];
+  getSubtasks = async (parentId: string): Promise<Issue[]> => {
+    const issues = await this.queryAll<Issue>("SELECT data FROM issues");
+    return issues.filter((issue) => issue.parentId === parentId);
+  };
 
   logWork = async (
     issueId: string,
@@ -702,21 +981,31 @@ export class SQLiteStorageAdapter implements AppStorage {
       createdAt: new Date().toISOString(),
     };
     const workLogs = [...(issue.workLogs ?? []), newLog];
-    await this.updateIssueInternal(issueId, { workLogs });
+    const updated: Issue = {
+      ...issue,
+      workLogs,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.updateIssueRow(updated);
   };
 
   toggleWatch = async (issueId: string): Promise<void> => {
     const issue = await this.getIssueByIdInternal(issueId);
     if (!issue) return;
     const currentUserId = this.getCurrentUserId();
-    const watcherIds = issue.watcherIds ?? [];
+    const watcherIds = [...(issue.watcherIds ?? [])];
     const index = watcherIds.indexOf(currentUserId);
     if (index >= 0) {
       watcherIds.splice(index, 1);
     } else {
       watcherIds.push(currentUserId);
     }
-    await this.updateIssueInternal(issueId, { watcherIds });
+    const updated: Issue = {
+      ...issue,
+      watcherIds,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.updateIssueRow(updated);
   };
 
   recordView = async (issueId: string): Promise<void> => {
@@ -1047,7 +1336,10 @@ export class SQLiteStorageAdapter implements AppStorage {
       yesterdayIso,
     });
     for (const issue of issues) {
-      await this.createIssueInternal(issue);
+      await db.runAsync(
+        "INSERT OR REPLACE INTO issues (id, projectId, data) VALUES (?, ?, ?)",
+        [issue.id, issue.projectId, JSON.stringify(issue)],
+      );
     }
 
     const notifications = getSeedNotifications(nowIso);
