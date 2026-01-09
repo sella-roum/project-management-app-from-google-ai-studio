@@ -8,7 +8,7 @@ import {
 import { useRouter } from "expo-router";
 
 import type { Issue } from "@repo/core";
-import { executeJQL } from "@repo/core";
+import { PRIORITY_LABELS, STATUS_LABELS, TYPE_LABELS, executeJQL } from "@repo/core";
 import {
   getCurrentUserId,
   getIssues,
@@ -30,7 +30,9 @@ export default function SearchScreen() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [isJqlMode, setIsJqlMode] = useState(false);
   const [filterProjectId, setFilterProjectId] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [savedFilters, setSavedFilters] = useState<
     { id: string; name: string; query: string; isFavorite: boolean }[]
   >([]);
@@ -102,6 +104,7 @@ export default function SearchScreen() {
     await reloadSavedFilters();
     setFilterName("");
     setActiveTab("saved");
+    setSaveModalOpen(false);
   };
 
   const handleToggleFavorite = async (id: string, isFavorite: boolean) => {
@@ -192,15 +195,12 @@ export default function SearchScreen() {
               ))}
             </ThemedView>
           ) : null}
-          <Pressable onPress={handleSaveFilter} style={styles.primaryButton}>
+          <Pressable
+            onPress={() => setSaveModalOpen(true)}
+            style={styles.primaryButton}
+          >
             <ThemedText type="link">この検索を保存</ThemedText>
           </Pressable>
-          <TextInput
-            style={styles.input}
-            placeholder="保存名"
-            value={filterName}
-            onChangeText={setFilterName}
-          />
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
@@ -211,6 +211,15 @@ export default function SearchScreen() {
             onChangeText={setQuery}
           />
           <ThemedView style={styles.filterRow}>
+            <Pressable
+              onPress={() => setShowAdvanced((prev) => !prev)}
+              style={[
+                styles.filterButton,
+                showAdvanced && styles.filterActive,
+              ]}
+            >
+              <ThemedText>詳細</ThemedText>
+            </Pressable>
             <Pressable
               onPress={() => setActiveFilter("assigned")}
               style={[
@@ -235,22 +244,39 @@ export default function SearchScreen() {
             >
               <ThemedText>Clear</ThemedText>
             </Pressable>
+            <Pressable
+              onPress={() => setSaveModalOpen(true)}
+              style={styles.filterButton}
+            >
+              <ThemedText>保存</ThemedText>
+            </Pressable>
           </ThemedView>
-          <ThemedView style={styles.section}>
-            <ThemedText type="subtitle">Project</ThemedText>
-            {projects.map((project) => (
+          {showAdvanced ? (
+            <ThemedView style={styles.section}>
+              <ThemedText type="subtitle">Project</ThemedText>
               <Pressable
-                key={project.id}
-                onPress={() => setFilterProjectId(project.id)}
+                onPress={() => setFilterProjectId("")}
                 style={[
                   styles.filterButton,
-                  filterProjectId === project.id && styles.filterActive,
+                  filterProjectId === "" && styles.filterActive,
                 ]}
               >
-                <ThemedText>{project.name}</ThemedText>
+                <ThemedText>すべてのプロジェクト</ThemedText>
               </Pressable>
-            ))}
-          </ThemedView>
+              {projects.map((project) => (
+                <Pressable
+                  key={project.id}
+                  onPress={() => setFilterProjectId(project.id)}
+                  style={[
+                    styles.filterButton,
+                    filterProjectId === project.id && styles.filterActive,
+                  ]}
+                >
+                  <ThemedText>{project.name}</ThemedText>
+                </Pressable>
+              ))}
+            </ThemedView>
+          ) : null}
         </ThemedView>
       )}
 
@@ -298,15 +324,30 @@ export default function SearchScreen() {
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
+          <ThemedText style={styles.metaText}>
+            結果: {filteredIssues.length}件
+          </ThemedText>
           {filteredIssues.map((issue) => (
             <Pressable
               key={issue.id}
               onPress={() => router.push(`/issue/${issue.id}`)}
               style={styles.card}
             >
-              <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
-              <ThemedText>{issue.title}</ThemedText>
-              <ThemedText>{issue.status}</ThemedText>
+              <ThemedView style={styles.rowBetween}>
+                <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
+                <ThemedText style={styles.metaText}>
+                  {STATUS_LABELS[issue.status]}
+                </ThemedText>
+              </ThemedView>
+              <ThemedText numberOfLines={2}>{issue.title}</ThemedText>
+              <ThemedView style={styles.metaRow}>
+                <ThemedText style={styles.metaBadge}>
+                  {TYPE_LABELS[issue.type]}
+                </ThemedText>
+                <ThemedText style={styles.metaBadge}>
+                  {PRIORITY_LABELS[issue.priority]}
+                </ThemedText>
+              </ThemedView>
             </Pressable>
           ))}
           {!ready ? <ThemedText>Loading...</ThemedText> : null}
@@ -315,6 +356,31 @@ export default function SearchScreen() {
           ) : null}
         </ThemedView>
       )}
+
+      {saveModalOpen ? (
+        <ThemedView style={styles.modalOverlay}>
+          <ThemedView style={styles.modalCard}>
+            <ThemedText type="subtitle">保存済みフィルタ</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="保存名"
+              value={filterName}
+              onChangeText={setFilterName}
+            />
+            <ThemedView style={styles.rowBetween}>
+              <Pressable
+                onPress={() => setSaveModalOpen(false)}
+                style={styles.secondaryButton}
+              >
+                <ThemedText>キャンセル</ThemedText>
+              </Pressable>
+              <Pressable onPress={handleSaveFilter} style={styles.primaryButton}>
+                <ThemedText type="link">保存</ThemedText>
+              </Pressable>
+            </ThemedView>
+          </ThemedView>
+        </ThemedView>
+      ) : null}
     </ScrollView>
   );
 }
@@ -357,6 +423,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#2563eb",
     borderRadius: 12,
+    paddingVertical: 10,
+  },
+  metaBadge: {
+    backgroundColor: "#f3f4f6",
+    borderRadius: 999,
+    fontSize: 11,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  metaRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  metaText: {
+    color: "#6b7280",
+    fontSize: 12,
+  },
+  modalCard: {
+    borderRadius: 16,
+    gap: 12,
+    padding: 16,
+  },
+  modalOverlay: {
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    padding: 24,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  secondaryButton: {
+    alignItems: "center",
+    backgroundColor: "#e5e7eb",
+    borderRadius: 12,
+    flex: 1,
     paddingVertical: 10,
   },
   section: {

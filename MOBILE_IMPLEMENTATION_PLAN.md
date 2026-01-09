@@ -53,21 +53,21 @@
 
 - [x] Summary: 統計カード/チャート/ワークロード/エピック進捗を実装。
 - [x] Board: スイムレーン、クイックフィルタ、WIP制限、状態別作成を実装（ステータス移動はボタン操作）。
-- [ ] Board: D&D操作の導入を検討（必要なら追加実装）。
+- [x] Board: D&D操作の導入を検討（必要なら追加実装）。
 - [x] Backlog: スプリント作成/開始/完了、インライン作成、バックログ管理を実装。
-- [ ] Backlog: D&D操作の導入を検討（必要なら追加実装）。
+- [x] Backlog: D&D操作の導入を検討（必要なら追加実装）。
 - [x] Timeline: ズーム/期日編集可能なタイムラインを実装（期日編集は入力方式）。
-- [ ] Releases: 期日/進捗/ステータス表示を追加。
-- [ ] Automation: ルール一覧と監査ログのUIをWebと揃える。
-- [ ] Settings: details/workflow/permissions/notifications のサブタブ + エディタモーダル。
+- [x] Releases: 期日/進捗/ステータス表示を追加。
+- [x] Automation: ルール一覧と監査ログのUIをWebと揃える。
+- [x] Settings: details/workflow/permissions/notifications のサブタブ + エディタモーダル。
   - 対象ファイル:
     - `apps/mobile/app/project/[projectId]/index.tsx`
     - `apps/web/src/components/Project/*`
 
 ## Phase 6: Searchの同等化
 
-- [ ] advanced切替UI、保存モーダル、課題カードUIをWebと揃える。
-- [ ] 保存フィルタの挙動をWebに合わせる。
+- [x] advanced切替UI、保存モーダル、課題カードUIをWebと揃える。
+- [x] 保存フィルタの挙動をWebに合わせる。
   - 対象ファイル:
     - `apps/mobile/app/(tabs)/search.tsx`
     - `apps/web/src/pages/Search.tsx`
@@ -75,17 +75,17 @@
 
 ## Phase 7: Notificationsの同等化
 
-- [ ] 種別アイコン、既読制御、手動「全既読」を実装。
-- [ ] 画面表示時の自動全既読を撤廃。
+- [x] 種別アイコン、既読制御、手動「全既読」を実装。
+- [x] 画面表示時の自動全既読を撤廃。
   - 対象ファイル:
     - `apps/mobile/app/(tabs)/notifications.tsx`
     - `apps/web/src/pages/Notifications.tsx`
 
 ## Phase 8: Profile / Help / Setupの同等化
 
-- [ ] Profile: アバター編集/通知トグル/言語/ログアウト/ヘルプ/確認ダイアログを追加。
-- [ ] Help: カードUI/サポートCTAを追加。
-- [ ] Setup: SetupWizardの強制表示挙動をモバイルに反映。
+- [x] Profile: アバター編集/通知トグル/言語/ログアウト/ヘルプ/確認ダイアログを追加。
+- [x] Help: カードUI/サポートCTAを追加。
+- [x] Setup: SetupWizardの強制表示挙動をモバイルに反映。
   - 対象ファイル:
     - `apps/mobile/app/(tabs)/profile.tsx`
     - `apps/mobile/app/(tabs)/help.tsx`
@@ -94,9 +94,9 @@
 
 ## Phase 9: ナビゲーション/グローバル導線
 
-- [ ] グローバル作成ボタンの統一導線を追加。
-- [ ] Project内でも常に作成導線が見える構成にする。
-- [ ] TopBar相当の設計（必要なら）を検討。
+- [x] グローバル作成ボタンの統一導線を追加。
+- [x] Project内でも常に作成導線が見える構成にする。
+- [x] TopBar相当の設計（必要なら）を検討。
   - 対象ファイル:
     - `apps/mobile/app/_layout.tsx`
     - `apps/mobile/app/(tabs)/_layout.tsx`
@@ -104,11 +104,11 @@
 
 ## Phase 10: Enum網羅 + QA
 
-- [ ] Mobile UIが全enumを扱えるようにする。
-  - [ ] IssueType: Epic
-  - [ ] IssuePriority: Highest/Lowest
-  - [ ] IssueStatus: In Review
-- [ ] パリティテスト/データ挙動のテストを追加。
+- [x] Mobile UIが全enumを扱えるようにする。
+  - [x] IssueType: Epic
+  - [x] IssuePriority: Highest/Lowest
+  - [x] IssueStatus: In Review
+- [x] パリティテスト/データ挙動のテストを追加。
   - 対象ファイル:
     - `packages/core/src/types/issue.ts`
     - `packages/storage/__tests__/adapter_parity.test.ts`

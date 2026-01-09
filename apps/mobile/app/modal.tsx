@@ -114,7 +114,7 @@ export default function ModalScreen() {
             onChangeText={setDescription}
           />
           <ThemedText type="subtitle">Type</ThemedText>
-          {["Task", "Bug", "Story"].map((value) => (
+          {(["Task", "Bug", "Story", "Epic"] as IssueType[]).map((value) => (
             <Pressable
               key={value}
               onPress={() => setIssueType(value)}
@@ -127,7 +127,8 @@ export default function ModalScreen() {
             </Pressable>
           ))}
           <ThemedText type="subtitle">Status</ThemedText>
-          {["To Do", "In Progress", "Done"].map((value) => (
+          {(["To Do", "In Progress", "In Review", "Done"] as IssueStatus[]).map(
+            (value) => (
             <Pressable
               key={value}
               onPress={() => setStatus(value)}
@@ -140,7 +141,9 @@ export default function ModalScreen() {
             </Pressable>
           ))}
           <ThemedText type="subtitle">Priority</ThemedText>
-          {["Low", "Medium", "High"].map((value) => (
+          {(
+            ["Highest", "High", "Medium", "Low", "Lowest"] as IssuePriority[]
+          ).map((value) => (
             <Pressable
               key={value}
               onPress={() => setPriority(value)}
