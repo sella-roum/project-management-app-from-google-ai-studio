@@ -47,5 +47,41 @@ test(
       mobile.getRecentIssues(),
     ]);
     assert.equal(webRecent.length, mobileRecent.length);
+
+    const webProjectId = (await web.getProjects())[0]?.id ?? "";
+    const mobileProjectId = (await mobile.getProjects())[0]?.id ?? "";
+    const webEpic = await web.createIssue({
+      projectId: webProjectId,
+      title: "Epic issue",
+      type: "Epic",
+      status: "In Review",
+      priority: "Highest",
+    });
+    const mobileEpic = await mobile.createIssue({
+      projectId: mobileProjectId,
+      title: "Epic issue",
+      type: "Epic",
+      status: "In Review",
+      priority: "Highest",
+    });
+    assert.equal(webEpic.type, mobileEpic.type);
+    assert.equal(webEpic.status, mobileEpic.status);
+    assert.equal(webEpic.priority, mobileEpic.priority);
+
+    const webLow = await web.createIssue({
+      projectId: webProjectId,
+      title: "Lowest priority task",
+      type: "Task",
+      status: "To Do",
+      priority: "Lowest",
+    });
+    const mobileLow = await mobile.createIssue({
+      projectId: mobileProjectId,
+      title: "Lowest priority task",
+      type: "Task",
+      status: "To Do",
+      priority: "Lowest",
+    });
+    assert.equal(webLow.priority, mobileLow.priority);
   },
 );
