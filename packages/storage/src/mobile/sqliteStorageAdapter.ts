@@ -443,10 +443,10 @@ export class SQLiteStorageAdapter implements AppStorage {
   private updateIssueInternal = async (
     id: ID,
     patch: Partial<Issue>,
-  ): Promise<Issue | false> => {
+  ): Promise<Issue | false | undefined> => {
     const existing = await this.getIssueByIdInternal(id);
     if (!existing) {
-      throw new Error(`Issue not found: ${id}`);
+      return undefined;
     }
 
     if (patch.status && patch.status !== existing.status) {
@@ -817,6 +817,10 @@ export class SQLiteStorageAdapter implements AppStorage {
     action: string,
     _project?: Project,
   ): boolean => {
+    // Expected permission semantics (placeholder until roles are modeled):
+    // - "manage_project": project lead/admin only.
+    // - "delete_issue": project lead/admin only.
+    // - other actions: project members.
     if (userId === "u1") return true;
     if (action === "manage_project") return userId === "u2";
     return true;
@@ -855,18 +859,19 @@ export class SQLiteStorageAdapter implements AppStorage {
   updateIssue = async (
     id: string,
     updates: Partial<Issue>,
-  ): Promise<Issue | false> => this.updateIssueInternal(id, updates);
+  ): Promise<Issue | false | undefined> =>
+    this.updateIssueInternal(id, updates);
 
   getIssuesForUser = async (userId: string): Promise<Issue[]> => {
     const issues = await this.queryAll<Issue>("SELECT data FROM issues");
     return issues.filter((issue) => issue.assigneeId === userId);
   };
 
-  updateIssueStatus = async (id: string, status: IssueStatus) => {
-    const result = await this.updateIssueInternal(id, { status });
-    if (result === false) return undefined;
-    return result;
-  };
+  updateIssueStatus = async (
+    id: string,
+    status: IssueStatus,
+  ): Promise<Issue | false | undefined> =>
+    this.updateIssueInternal(id, { status });
 
   deleteIssue = async (id: string): Promise<void> =>
     this.deleteIssueInternal(id);
@@ -966,8 +971,10 @@ export class SQLiteStorageAdapter implements AppStorage {
   };
 
   getSubtasks = async (parentId: string): Promise<Issue[]> => {
-    const issues = await this.queryAll<Issue>("SELECT data FROM issues");
-    return issues.filter((issue) => issue.parentId === parentId);
+    return this.queryAll<Issue>(
+      "SELECT data FROM issues WHERE json_extract(data, '$.parentId') = ?",
+      [parentId],
+    );
   };
 
   logWork = async (

@@ -58,7 +58,7 @@ export default function RootLayout() {
         visible={showSetupWizard}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowSetupWizard(true)}
+        onRequestClose={() => {}}
       >
         <View style={styles.modalBackdrop}>
           <SetupWizard onComplete={handleSetupComplete} />

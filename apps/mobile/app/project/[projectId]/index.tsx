@@ -124,8 +124,8 @@ export default function ProjectViewScreen() {
   const [newVersionName, setNewVersionName] = useState("");
   const [newVersionDate, setNewVersionDate] = useState("");
   const [workflowSettings, setWorkflowSettings] = useState<
-    Record<string, string[]>
-  >({});
+    Record<IssueStatus, IssueStatus[]>
+  >({} as Record<IssueStatus, IssueStatus[]>);
   const [notificationSettings, setNotificationSettings] = useState<
     Record<string, string[]>
   >({});
@@ -137,9 +137,9 @@ export default function ProjectViewScreen() {
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showWorkflowEditor, setShowWorkflowEditor] = useState(false);
   const [showNotificationEditor, setShowNotificationEditor] = useState(false);
-  const [workflowDraft, setWorkflowDraft] = useState<Record<string, string[]>>(
-    {},
-  );
+  const [workflowDraft, setWorkflowDraft] = useState<
+    Record<IssueStatus, IssueStatus[]>
+  >({} as Record<IssueStatus, IssueStatus[]>);
   const [notificationDraft, setNotificationDraft] = useState<
     Record<string, string[]>
   >({});
@@ -188,18 +188,24 @@ export default function ProjectViewScreen() {
     setProjectKey(projectData?.key ?? "");
     setProjectDescription(projectData?.description ?? "");
     setProjectCategory(projectData?.category ?? "");
-    const workflow =
-      projectData?.workflowSettings ?? WORKFLOW_TRANSITIONS;
+    const workflow = (projectData?.workflowSettings ??
+      WORKFLOW_TRANSITIONS) as Record<IssueStatus, IssueStatus[]>;
     const notifications =
       projectData?.notificationSettings ?? DEFAULT_NOTIFICATION_SCHEME;
     setWorkflowSettings(
       Object.fromEntries(
-        Object.entries(workflow).map(([status, next]) => [status, [...next]]),
+        Object.entries(workflow).map(([status, next]) => [
+          status as IssueStatus,
+          [...next],
+        ]),
       ),
     );
     setWorkflowDraft(
       Object.fromEntries(
-        Object.entries(workflow).map(([status, next]) => [status, [...next]]),
+        Object.entries(workflow).map(([status, next]) => [
+          status as IssueStatus,
+          [...next],
+        ]),
       ),
     );
     setNotificationSettings(
@@ -290,20 +296,29 @@ export default function ProjectViewScreen() {
 
   const handleSaveDetails = async () => {
     if (!normalizedProjectId) return;
-    await updateProject(normalizedProjectId, {
-      name: projectName,
-      description: projectDescription,
-      category: projectCategory || project?.category || "Software",
-    });
-    setSettingsSaved(true);
     if (settingsSavedTimeoutRef.current) {
       clearTimeout(settingsSavedTimeoutRef.current);
+      settingsSavedTimeoutRef.current = null;
     }
-    settingsSavedTimeoutRef.current = setTimeout(
-      () => setSettingsSaved(false),
-      2000,
-    );
-    await reload();
+    try {
+      await updateProject(normalizedProjectId, {
+        name: projectName,
+        description: projectDescription,
+        category: projectCategory || project?.category || "Software",
+      });
+      await reload();
+      setSettingsSaved(true);
+      settingsSavedTimeoutRef.current = setTimeout(
+        () => {
+          setSettingsSaved(false);
+          settingsSavedTimeoutRef.current = null;
+        },
+        2000,
+      );
+    } catch (error) {
+      console.error("Failed to save project details", error);
+      setSettingsSaved(false);
+    }
   };
 
   const handleDeleteProject = async () => {
@@ -499,8 +514,13 @@ export default function ProjectViewScreen() {
       const newSprint = await createSprint(normalizedProjectId);
       targetSprintId = newSprint.id;
     }
-    for (const issue of incomplete) {
-      await updateIssue(issue.id, { sprintId: targetSprintId });
+    const updates = incomplete.map((issue) =>
+      updateIssue(issue.id, { sprintId: targetSprintId }),
+    );
+    try {
+      await Promise.all(updates);
+    } catch (error) {
+      console.error("Failed to move sprint issues", error);
     }
     await updateSprintStatus(completeSprint.id, "completed");
     setCompleteSprint(null);
@@ -643,8 +663,9 @@ export default function ProjectViewScreen() {
       sprint.name.includes("バックログ"),
     );
     if (existing) return existing;
+    const backlogId = `__backlog__:${normalizedProjectId ?? "unknown"}`;
     return {
-      id: "backlog",
+      id: backlogId,
       name: "バックログ",
       status: "future",
       projectId: normalizedProjectId ?? "",
@@ -667,8 +688,10 @@ export default function ProjectViewScreen() {
       end = new Date(now.getFullYear(), now.getMonth() + 4, 0);
     }
 
-    const totalDays =
-      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+    const totalDays = Math.max(
+      1,
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     return { start, end, totalDays };
   }, [timelineZoom]);
@@ -1023,7 +1046,7 @@ export default function ProjectViewScreen() {
                     },
                   );
                   const backlogTargetId =
-                    backlogSprint.id === "backlog"
+                    backlogSprint.id.startsWith("__backlog__:")
                       ? undefined
                       : backlogSprint.id;
                   return (
@@ -1228,7 +1251,7 @@ export default function ProjectViewScreen() {
                   const endDate = issue.dueDate
                     ? new Date(issue.dueDate)
                     : new Date(startDate.getTime() + 7 * 86400000);
-                  const totalDays = timelineConfig.totalDays || 1;
+                  const totalDays = timelineConfig.totalDays;
                   const startDays =
                     (startDate.getTime() - timelineConfig.start.getTime()) /
                     86400000;
@@ -1581,7 +1604,7 @@ export default function ProjectViewScreen() {
                         {(workflowSettings[status] ?? []).length > 0 ? (
                           (workflowSettings[status] ?? []).map((next) => (
                             <ThemedText key={next} style={styles.metaBadge}>
-                              {STATUS_LABELS[next as IssueStatus] ?? next}
+                              {STATUS_LABELS[next] ?? next}
                             </ThemedText>
                           ))
                         ) : (

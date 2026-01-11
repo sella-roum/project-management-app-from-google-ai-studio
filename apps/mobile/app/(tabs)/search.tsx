@@ -408,6 +408,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
   },
+  rowBetween: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   metaText: {
     color: "#6b7280",
     fontSize: 12,

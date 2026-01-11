@@ -8,10 +8,13 @@ import { getCurrentUser, getUserStats, reset, updateUser } from "@repo/storage";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useStorageReady } from "@/hooks/use-storage";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function ProfileScreen() {
   const ready = useStorageReady();
   const router = useRouter();
+  const inputTextColor = useThemeColor({}, "text");
+  const inputPlaceholderColor = useThemeColor({}, "icon");
   const [isEditing, setIsEditing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [name, setName] = useState("");
@@ -197,24 +200,27 @@ export default function ProfileScreen() {
         {isEditing ? (
           <ThemedView style={styles.section}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: inputTextColor }]}
               placeholder="Name"
               value={name}
               onChangeText={setName}
+              placeholderTextColor={inputPlaceholderColor}
             />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: inputTextColor }]}
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
+              placeholderTextColor={inputPlaceholderColor}
             />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: inputTextColor }]}
               placeholder="Avatar URL"
               value={avatarUrl}
               onChangeText={setAvatarUrl}
               autoCapitalize="none"
+              placeholderTextColor={inputPlaceholderColor}
             />
           </ThemedView>
         ) : (
