@@ -1,7 +1,8 @@
 import { Tabs, useRouter } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { FloatingActionButton } from "@/components/floating-action-button";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
@@ -88,19 +89,13 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-      <Pressable
+      <FloatingActionButton
         onPress={() =>
           router.push({ pathname: "/modal", params: { mode: "issue" } })
         }
-        style={({ pressed }) => [
-          styles.fab,
-          pressed && styles.fabPressed,
-        ]}
-        accessibilityRole="button"
         accessibilityLabel="Create issue"
-      >
-        <IconSymbol size={28} name="plus" color="#fff" />
-      </Pressable>
+        style={styles.fab}
+      />
     </View>
   );
 }
@@ -110,22 +105,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fab: {
-    alignItems: "center",
-    backgroundColor: "#2563eb",
-    borderRadius: 28,
     bottom: 88,
-    elevation: 6,
-    height: 56,
-    justifyContent: "center",
-    position: "absolute",
-    right: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    width: 56,
-  },
-  fabPressed: {
-    opacity: 0.85,
   },
 });

@@ -78,8 +78,10 @@ export const updateIssueStatus = (
   status: Parameters<typeof storage.updateIssueStatus>[1],
 ) => storage.updateIssueStatus(id, status);
 export const deleteIssue = (id: string) => storage.deleteIssue(id);
-export const addAttachment = (issueId: string, file: File) =>
-  storage.addAttachment(issueId, file);
+export const addAttachment = (
+  issueId: string,
+  file: Parameters<typeof storage.addAttachment>[1],
+) => storage.addAttachment(issueId, file);
 export const addComment = (id: string, text: string) =>
   storage.addComment(id, text);
 export const getSubtasks = (parentId: string) => storage.getSubtasks(parentId);
@@ -110,8 +112,12 @@ export const updateVersion = (
 export const deleteVersion = (id: string) => storage.deleteVersion(id);
 export const getSavedFilters = (ownerId?: string) =>
   storage.getSavedFilters(ownerId);
-export const saveFilter = (name: string, query: string, ownerId?: string) =>
-  storage.saveFilter(name, query, ownerId);
+export const saveFilter = (
+  name: string,
+  query: string,
+  ownerId?: string,
+  isJqlMode?: boolean,
+) => storage.saveFilter(name, query, ownerId, isJqlMode);
 export const updateSavedFilter = (
   id: string,
   patch: Parameters<typeof storage.updateSavedFilter>[1],

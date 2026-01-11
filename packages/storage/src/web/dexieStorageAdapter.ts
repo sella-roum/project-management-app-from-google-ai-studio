@@ -76,6 +76,11 @@ const createWatchById = async <T>(
   return () => subscription.unsubscribe();
 };
 
+const normalizeSavedFilter = (filter: SavedFilter): SavedFilter => ({
+  ...filter,
+  isJqlMode: filter.isJqlMode ?? false,
+});
+
 export class DexieStorageAdapter implements AppStorage {
   db: JiraCloneDB;
   settings: SettingsStore;
@@ -162,7 +167,7 @@ export class DexieStorageAdapter implements AppStorage {
     this.savedFilters = {
       listByOwner: (ownerId) => this.getSavedFilters(ownerId),
       create: (input) =>
-        this.saveFilter(input.name, input.query, input.ownerId),
+        this.saveFilter(input.name, input.query, input.ownerId, input.isJqlMode),
       update: (id, patch) => this.updateSavedFilter(id, patch),
       remove: (id) => this.deleteSavedFilter(id),
       watchAll: (listener) => createWatchAll(this.db.savedFilters, listener),
@@ -921,19 +926,22 @@ export class DexieStorageAdapter implements AppStorage {
 
   getSavedFilters = async (ownerId?: string): Promise<SavedFilter[]> => {
     const all = await this.db.savedFilters.toArray();
-    if (!ownerId) return all;
-    return all.filter((filter) => filter.ownerId === ownerId);
+    const normalized = all.map(normalizeSavedFilter);
+    if (!ownerId) return normalized;
+    return normalized.filter((filter) => filter.ownerId === ownerId);
   };
 
   saveFilter = async (
     name: string,
     query: string,
     ownerId?: string,
+    isJqlMode = false,
   ): Promise<SavedFilter> => {
     const newFilter: SavedFilter = {
       id: `f-${Date.now()}`,
       name,
       query,
+      isJqlMode,
       ownerId: ownerId || this.getCurrentUserId(),
       isFavorite: false,
     };
@@ -950,7 +958,7 @@ export class DexieStorageAdapter implements AppStorage {
     if (!updated) {
       throw new Error(`Saved filter not found: ${id}`);
     }
-    return updated;
+    return normalizeSavedFilter(updated);
   };
 
   deleteSavedFilter = async (id: string): Promise<void> => {

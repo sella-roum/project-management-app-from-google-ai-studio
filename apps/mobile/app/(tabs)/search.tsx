@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -7,7 +8,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-import type { Issue } from "@repo/core";
+import type { Issue, SavedFilter } from "@repo/core";
 import { executeJQL } from "@repo/core";
 import {
   getCurrentUserId,
@@ -21,6 +22,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { IssueCard } from "@/components/issue-card";
 import { useStorageReady } from "@/hooks/use-storage";
 
 export default function SearchScreen() {
@@ -30,10 +32,10 @@ export default function SearchScreen() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [isJqlMode, setIsJqlMode] = useState(false);
   const [filterProjectId, setFilterProjectId] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
-  const [savedFilters, setSavedFilters] = useState<
-    { id: string; name: string; query: string; isFavorite: boolean }[]
-  >([]);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [filterName, setFilterName] = useState("");
@@ -98,10 +100,11 @@ export default function SearchScreen() {
           ? `assigneeId = ${uid}`
           : `reporterId = ${uid}`;
     }
-    await saveFilter(filterName, finalQuery);
+    await saveFilter(filterName, finalQuery, undefined, isJqlMode);
     await reloadSavedFilters();
     setFilterName("");
     setActiveTab("saved");
+    setSaveModalOpen(false);
   };
 
   const handleToggleFavorite = async (id: string, isFavorite: boolean) => {
@@ -192,15 +195,12 @@ export default function SearchScreen() {
               ))}
             </ThemedView>
           ) : null}
-          <Pressable onPress={handleSaveFilter} style={styles.primaryButton}>
+          <Pressable
+            onPress={() => setSaveModalOpen(true)}
+            style={styles.primaryButton}
+          >
             <ThemedText type="link">この検索を保存</ThemedText>
           </Pressable>
-          <TextInput
-            style={styles.input}
-            placeholder="保存名"
-            value={filterName}
-            onChangeText={setFilterName}
-          />
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
@@ -211,6 +211,15 @@ export default function SearchScreen() {
             onChangeText={setQuery}
           />
           <ThemedView style={styles.filterRow}>
+            <Pressable
+              onPress={() => setShowAdvanced((prev) => !prev)}
+              style={[
+                styles.filterButton,
+                showAdvanced && styles.filterActive,
+              ]}
+            >
+              <ThemedText>詳細</ThemedText>
+            </Pressable>
             <Pressable
               onPress={() => setActiveFilter("assigned")}
               style={[
@@ -235,22 +244,39 @@ export default function SearchScreen() {
             >
               <ThemedText>Clear</ThemedText>
             </Pressable>
+            <Pressable
+              onPress={() => setSaveModalOpen(true)}
+              style={styles.filterButton}
+            >
+              <ThemedText>保存</ThemedText>
+            </Pressable>
           </ThemedView>
-          <ThemedView style={styles.section}>
-            <ThemedText type="subtitle">Project</ThemedText>
-            {projects.map((project) => (
+          {showAdvanced ? (
+            <ThemedView style={styles.section}>
+              <ThemedText type="subtitle">Project</ThemedText>
               <Pressable
-                key={project.id}
-                onPress={() => setFilterProjectId(project.id)}
+                onPress={() => setFilterProjectId("")}
                 style={[
                   styles.filterButton,
-                  filterProjectId === project.id && styles.filterActive,
+                  filterProjectId === "" && styles.filterActive,
                 ]}
               >
-                <ThemedText>{project.name}</ThemedText>
+                <ThemedText>すべてのプロジェクト</ThemedText>
               </Pressable>
-            ))}
-          </ThemedView>
+              {projects.map((project) => (
+                <Pressable
+                  key={project.id}
+                  onPress={() => setFilterProjectId(project.id)}
+                  style={[
+                    styles.filterButton,
+                    filterProjectId === project.id && styles.filterActive,
+                  ]}
+                >
+                  <ThemedText>{project.name}</ThemedText>
+                </Pressable>
+              ))}
+            </ThemedView>
+          ) : null}
         </ThemedView>
       )}
 
@@ -263,7 +289,7 @@ export default function SearchScreen() {
               <ThemedView key={filter.id} style={styles.card}>
                 <Pressable
                   onPress={() => {
-                    setIsJqlMode(true);
+                    setIsJqlMode(filter.isJqlMode);
                     setQuery(filter.query);
                     setActiveTab("all");
                   }}
@@ -298,16 +324,15 @@ export default function SearchScreen() {
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
+          <ThemedText style={styles.metaText}>
+            結果: {filteredIssues.length}件
+          </ThemedText>
           {filteredIssues.map((issue) => (
-            <Pressable
+            <IssueCard
               key={issue.id}
+              issue={issue}
               onPress={() => router.push(`/issue/${issue.id}`)}
-              style={styles.card}
-            >
-              <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
-              <ThemedText>{issue.title}</ThemedText>
-              <ThemedText>{issue.status}</ThemedText>
-            </Pressable>
+            />
           ))}
           {!ready ? <ThemedText>Loading...</ThemedText> : null}
           {ready && filteredIssues.length === 0 ? (
@@ -315,6 +340,35 @@ export default function SearchScreen() {
           ) : null}
         </ThemedView>
       )}
+
+      <Modal
+        transparent
+        visible={saveModalOpen}
+        onRequestClose={() => setSaveModalOpen(false)}
+      >
+        <ThemedView style={styles.modalOverlay}>
+          <ThemedView style={styles.modalCard}>
+            <ThemedText type="subtitle">保存済みフィルタ</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="保存名"
+              value={filterName}
+              onChangeText={setFilterName}
+            />
+            <ThemedView style={styles.rowBetween}>
+              <Pressable
+                onPress={() => setSaveModalOpen(false)}
+                style={styles.secondaryButton}
+              >
+                <ThemedText>キャンセル</ThemedText>
+              </Pressable>
+              <Pressable onPress={handleSaveFilter} style={styles.primaryButton}>
+                <ThemedText type="link">保存</ThemedText>
+              </Pressable>
+            </ThemedView>
+          </ThemedView>
+        </ThemedView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -325,11 +379,6 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: 24,
     paddingVertical: 24,
-  },
-  card: {
-    borderRadius: 12,
-    gap: 4,
-    padding: 12,
   },
   filterActive: {
     borderColor: "#2563eb",
@@ -357,6 +406,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#2563eb",
     borderRadius: 12,
+    paddingVertical: 10,
+  },
+  rowBetween: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  metaText: {
+    color: "#6b7280",
+    fontSize: 12,
+  },
+  modalCard: {
+    borderRadius: 16,
+    gap: 12,
+    padding: 16,
+  },
+  modalOverlay: {
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    padding: 24,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  secondaryButton: {
+    alignItems: "center",
+    backgroundColor: "#e5e7eb",
+    borderRadius: 12,
+    flex: 1,
     paddingVertical: 10,
   },
   section: {

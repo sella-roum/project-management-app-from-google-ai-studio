@@ -30,7 +30,7 @@ export interface IssuesRepo extends Watchable<Issue> {
   create(
     input: Partial<Issue> & { projectId: ID; title: string },
   ): Promise<Issue>;
-  update(id: ID, patch: Partial<Issue>): Promise<Issue>;
+  update(id: ID, patch: Partial<Issue>): Promise<Issue | false | undefined>;
   updateStatus(id: ID, status: Issue["status"]): Promise<void>;
   remove(id: ID): Promise<void>;
 }
