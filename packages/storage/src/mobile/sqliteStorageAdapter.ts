@@ -60,6 +60,10 @@ type SQLiteRow = {
 
 const SEED_USERS: User[] = getSeedUsers();
 const DEFAULT_POLL_INTERVAL_MS = 1000;
+const normalizeSavedFilter = (filter: SavedFilter): SavedFilter => ({
+  ...filter,
+  isJqlMode: filter.isJqlMode ?? false,
+});
 
 export class SQLiteStorageAdapter implements AppStorage {
   private dbPromise: Promise<SQLite.SQLiteDatabase>;
@@ -1100,23 +1104,29 @@ export class SQLiteStorageAdapter implements AppStorage {
 
   getSavedFilters = async (ownerId?: string): Promise<SavedFilter[]> => {
     if (!ownerId) {
-      return this.queryAll<SavedFilter>("SELECT data FROM saved_filters");
+      const saved = await this.queryAll<SavedFilter>(
+        "SELECT data FROM saved_filters",
+      );
+      return saved.map(normalizeSavedFilter);
     }
-    return this.queryAll<SavedFilter>(
+    const saved = await this.queryAll<SavedFilter>(
       "SELECT data FROM saved_filters WHERE ownerId = ?",
       [ownerId],
     );
+    return saved.map(normalizeSavedFilter);
   };
 
   saveFilter = async (
     name: string,
     query: string,
     ownerId?: string,
+    isJqlMode = false,
   ): Promise<SavedFilter> => {
     const newFilter: SavedFilter = {
       id: `f-${Date.now()}`,
       name,
       query,
+      isJqlMode,
       ownerId: ownerId ?? this.getCurrentUserId(),
       isFavorite: false,
     };
@@ -1139,7 +1149,13 @@ export class SQLiteStorageAdapter implements AppStorage {
     if (!existing) {
       throw new Error(`Saved filter not found: ${id}`);
     }
-    const updated = { ...existing, ...patch };
+    const normalized = normalizeSavedFilter(existing);
+    const updated = {
+      ...normalized,
+      ...patch,
+      isJqlMode:
+        patch.isJqlMode ?? normalized.isJqlMode ?? false,
+    };
     const db = await this.getDb();
     await db.runAsync(
       "UPDATE saved_filters SET data = ?, ownerId = ? WHERE id = ?",

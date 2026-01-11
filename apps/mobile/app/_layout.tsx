@@ -1,11 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Stack, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import { Modal, StyleSheet, View } from "react-native";
 
 import { SetupWizard } from "@/components/setup-wizard";
 
 export default function RootLayout() {
+  const router = useRouter();
   const segments = useSegments();
   const [showSetupWizard, setShowSetupWizard] = useState(false);
 
@@ -37,6 +38,11 @@ export default function RootLayout() {
     };
   }, [segments]);
 
+  const handleSetupComplete = () => {
+    setShowSetupWizard(false);
+    router.replace("/(tabs)/home");
+  };
+
   return (
     <View style={styles.container}>
       <Stack>
@@ -48,9 +54,14 @@ export default function RootLayout() {
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: "modal" }} />
       </Stack>
-      <Modal visible={showSetupWizard} transparent animationType="fade">
+      <Modal
+        visible={showSetupWizard}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSetupWizard(true)}
+      >
         <View style={styles.modalBackdrop}>
-          <SetupWizard onComplete={() => setShowSetupWizard(false)} />
+          <SetupWizard onComplete={handleSetupComplete} />
         </View>
       </Modal>
     </View>

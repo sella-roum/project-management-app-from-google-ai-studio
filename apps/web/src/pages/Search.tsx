@@ -244,7 +244,7 @@ export const Search = ({
             >
               <button
                 onClick={() => {
-                  setIsJqlMode(true);
+                  setIsJqlMode(f.isJqlMode);
                   setQuery(f.query);
                   setActiveTab("all");
                 }}

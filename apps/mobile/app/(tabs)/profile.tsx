@@ -44,6 +44,7 @@ export default function ProfileScreen() {
   }, []);
 
   const handleSave = async () => {
+    if (isProcessing) return;
     const user = await getCurrentUser();
     if (!user) return;
     setIsProcessing(true);
@@ -62,6 +63,7 @@ export default function ProfileScreen() {
   };
 
   const handleToggleNotifications = async () => {
+    if (isProcessing) return;
     const next = !notificationsEnabled;
     setIsProcessing(true);
     try {
@@ -87,6 +89,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
+    if (isProcessing) return;
     Alert.alert("ログアウト", "ログアウトしてもよろしいですか？", [
       { text: "キャンセル", style: "cancel" },
       {
@@ -99,7 +102,6 @@ export default function ProfileScreen() {
               "isLoggedIn",
               "currentUserId",
             ]);
-            setIsProcessing(false);
             router.replace("/(auth)/login");
           } catch (error) {
             console.error("Failed to log out", error);
@@ -107,6 +109,7 @@ export default function ProfileScreen() {
               "ログアウトエラー",
               "ログアウトに失敗しました。もう一度お試しください。",
             );
+          } finally {
             setIsProcessing(false);
           }
         },
@@ -115,6 +118,7 @@ export default function ProfileScreen() {
   };
 
   const handleReset = () => {
+    if (isProcessing) return;
     Alert.alert(
       "アプリの初期化",
       "すべてのプロジェクトと課題が削除されます。この操作は取り消せません。",
@@ -133,13 +137,13 @@ export default function ProfileScreen() {
                 "hasSetup",
               ]);
               router.replace("/(auth)/welcome");
-              setIsProcessing(false);
             } catch (error) {
               console.error("Failed to reset app", error);
               Alert.alert(
                 "初期化エラー",
                 "初期化に失敗しました。もう一度お試しください。",
               );
+            } finally {
               setIsProcessing(false);
             }
           },
@@ -153,15 +157,27 @@ export default function ProfileScreen() {
       <ThemedView style={styles.headerRow}>
         <ThemedText type="title">Profile</ThemedText>
         {!isEditing ? (
-          <Pressable onPress={() => setIsEditing(true)} style={styles.secondaryButton}>
+          <Pressable
+            onPress={() => setIsEditing(true)}
+            disabled={isProcessing}
+            style={styles.secondaryButton}
+          >
             <ThemedText>編集</ThemedText>
           </Pressable>
         ) : (
           <ThemedView style={styles.headerRow}>
-            <Pressable onPress={() => setIsEditing(false)} style={styles.ghostButton}>
+            <Pressable
+              onPress={() => setIsEditing(false)}
+              disabled={isProcessing}
+              style={styles.ghostButton}
+            >
               <ThemedText>キャンセル</ThemedText>
             </Pressable>
-            <Pressable onPress={handleSave} style={styles.primaryButton}>
+            <Pressable
+              onPress={handleSave}
+              disabled={isProcessing}
+              style={styles.primaryButton}
+            >
               <ThemedText type="link">保存</ThemedText>
             </Pressable>
           </ThemedView>
@@ -210,7 +226,11 @@ export default function ProfileScreen() {
       </ThemedView>
 
       <ThemedView style={styles.menuCard}>
-        <Pressable onPress={handleToggleNotifications} style={styles.menuItem}>
+        <Pressable
+          onPress={handleToggleNotifications}
+          disabled={isProcessing}
+          style={styles.menuItem}
+        >
           <ThemedText>通知</ThemedText>
           <ThemedView
             style={[
@@ -233,7 +253,11 @@ export default function ProfileScreen() {
         <Pressable onPress={() => router.push("/(tabs)/help")} style={styles.menuItem}>
           <ThemedText>ヘルプ</ThemedText>
         </Pressable>
-        <Pressable onPress={handleLogout} style={styles.menuItem}>
+        <Pressable
+          onPress={handleLogout}
+          disabled={isProcessing}
+          style={styles.menuItem}
+        >
           <ThemedText style={styles.dangerText}>ログアウト</ThemedText>
         </Pressable>
       </ThemedView>
@@ -245,7 +269,11 @@ export default function ProfileScreen() {
         <ThemedText>Leading projects: {stats.leading}</ThemedText>
       </ThemedView>
 
-      <Pressable onPress={handleReset} style={styles.dangerButton} disabled={isProcessing}>
+      <Pressable
+        onPress={handleReset}
+        style={styles.dangerButton}
+        disabled={isProcessing}
+      >
         <ThemedText type="link">
           {isProcessing ? "処理中..." : "アプリを初期化する"}
         </ThemedText>

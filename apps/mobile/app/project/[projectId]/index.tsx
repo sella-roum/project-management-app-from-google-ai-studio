@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Alert,
@@ -133,6 +133,8 @@ export default function ProjectViewScreen() {
     "details" | "workflow" | "permissions" | "notifications"
   >("details");
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const settingsSavedTimeoutRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showWorkflowEditor, setShowWorkflowEditor] = useState(false);
   const [showNotificationEditor, setShowNotificationEditor] = useState(false);
   const [workflowDraft, setWorkflowDraft] = useState<Record<string, string[]>>(
@@ -219,6 +221,14 @@ export default function ProjectViewScreen() {
   }, [normalizedProjectId]);
 
   useEffect(() => {
+    return () => {
+      if (settingsSavedTimeoutRef.current) {
+        clearTimeout(settingsSavedTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!ready || !normalizedProjectId) return;
     void reload();
   }, [ready, normalizedProjectId, reload]);
@@ -286,7 +296,13 @@ export default function ProjectViewScreen() {
       category: projectCategory || project?.category || "Software",
     });
     setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 2000);
+    if (settingsSavedTimeoutRef.current) {
+      clearTimeout(settingsSavedTimeoutRef.current);
+    }
+    settingsSavedTimeoutRef.current = setTimeout(
+      () => setSettingsSaved(false),
+      2000,
+    );
     await reload();
   };
 

@@ -101,8 +101,12 @@ export const createVersion = (
 ) => storage.createVersion(version);
 export const getSavedFilters = (ownerId?: string) =>
   storage.getSavedFilters(ownerId);
-export const saveFilter = (name: string, query: string, ownerId?: string) =>
-  storage.saveFilter(name, query, ownerId);
+export const saveFilter = (
+  name: string,
+  query: string,
+  ownerId?: string,
+  isJqlMode?: boolean,
+) => storage.saveFilter(name, query, ownerId, isJqlMode);
 export const updateSavedFilter = (
   id: string,
   patch: Parameters<typeof storage.updateSavedFilter>[1],

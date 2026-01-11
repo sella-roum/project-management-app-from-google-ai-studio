@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-import type { Issue } from "@repo/core";
+import type { Issue, SavedFilter } from "@repo/core";
 import { executeJQL } from "@repo/core";
 import {
   getCurrentUserId,
@@ -35,9 +35,7 @@ export default function SearchScreen() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
   const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [savedFilters, setSavedFilters] = useState<
-    { id: string; name: string; query: string; isFavorite: boolean }[]
-  >([]);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [filterName, setFilterName] = useState("");
@@ -102,7 +100,7 @@ export default function SearchScreen() {
           ? `assigneeId = ${uid}`
           : `reporterId = ${uid}`;
     }
-    await saveFilter(filterName, finalQuery);
+    await saveFilter(filterName, finalQuery, undefined, isJqlMode);
     await reloadSavedFilters();
     setFilterName("");
     setActiveTab("saved");
@@ -291,7 +289,7 @@ export default function SearchScreen() {
               <ThemedView key={filter.id} style={styles.card}>
                 <Pressable
                   onPress={() => {
-                    setIsJqlMode(true);
+                    setIsJqlMode(filter.isJqlMode);
                     setQuery(filter.query);
                     setActiveTab("all");
                   }}

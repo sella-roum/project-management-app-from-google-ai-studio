@@ -40,7 +40,7 @@ export const saveCurrentFilter = async ({
     isJqlMode,
     activeFilter,
   });
-  await saveFilter(filterName, finalQuery);
+  await saveFilter(filterName, finalQuery, undefined, isJqlMode);
 };
 
 export const toggleSavedFilterFavorite = async (
