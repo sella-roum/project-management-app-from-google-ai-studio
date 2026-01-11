@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput } from "react-native";
+import { Alert, Pressable, StyleSheet, TextInput } from "react-native";
 
 import { setupInitialProject } from "@repo/storage";
 
@@ -19,16 +19,26 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [loading, setLoading] = useState(false);
 
   const handleFinish = async () => {
-    if (!name) return;
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      Alert.alert("入力エラー", "プロジェクト名を入力してください。");
+      return;
+    }
+    const trimmedKey = key.trim();
+    const fallbackKey = trimmedName.toUpperCase().replace(/\s+/g, "");
+    const safeKey =
+      (trimmedKey || fallbackKey || "PRJ").slice(0, 5).padEnd(3, "J");
     setLoading(true);
-    await setupInitialProject(
-      name,
-      key || name.substring(0, 3).toUpperCase(),
-      type,
-    );
-    await AsyncStorage.setItem("hasSetup", "true");
-    setLoading(false);
-    onComplete();
+    try {
+      await setupInitialProject(trimmedName, safeKey, type);
+      await AsyncStorage.setItem("hasSetup", "true");
+      onComplete();
+    } catch (error) {
+      console.error("Failed to complete setup", error);
+      Alert.alert("作成エラー", "プロジェクト作成に失敗しました。");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

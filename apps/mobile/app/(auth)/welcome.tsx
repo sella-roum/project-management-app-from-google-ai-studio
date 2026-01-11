@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet } from "react-native";
+import { Alert, Pressable, StyleSheet } from "react-native";
 import { useState } from "react";
 
 import { clearDatabase, seedDatabase } from "@repo/storage";
@@ -14,22 +14,40 @@ export default function WelcomeScreen() {
 
   const handleDemoMode = async () => {
     setLoading(true);
-    await seedDatabase();
-    await AsyncStorage.multiSet([
-      ["appInitialized", "true"],
-      ["hasSetup", "true"],
-    ]);
-    setLoading(false);
-    router.replace("/(auth)/login");
+    try {
+      await seedDatabase();
+      await AsyncStorage.multiSet([
+        ["appInitialized", "true"],
+        ["hasSetup", "true"],
+      ]);
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("Failed to start demo mode", error);
+      Alert.alert(
+        "初期化エラー",
+        "デモデータの準備に失敗しました。もう一度お試しください。",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFreshStart = async () => {
     setLoading(true);
-    await clearDatabase();
-    await AsyncStorage.setItem("appInitialized", "true");
-    await AsyncStorage.removeItem("hasSetup");
-    setLoading(false);
-    router.replace("/(auth)/login");
+    try {
+      await clearDatabase();
+      await AsyncStorage.setItem("appInitialized", "true");
+      await AsyncStorage.removeItem("hasSetup");
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("Failed to start fresh", error);
+      Alert.alert(
+        "初期化エラー",
+        "初期化に失敗しました。もう一度お試しください。",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

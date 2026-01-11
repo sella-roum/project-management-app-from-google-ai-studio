@@ -46,8 +46,16 @@ export default function ProfileScreen() {
   const handleSave = async () => {
     const user = await getCurrentUser();
     if (!user) return;
-    await updateUser(user.id, { name, email, avatarUrl });
-    setIsEditing(false);
+    try {
+      await updateUser(user.id, { name, email, avatarUrl });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to save profile", error);
+      Alert.alert(
+        "保存エラー",
+        "プロフィールの更新に失敗しました。もう一度お試しください。",
+      );
+    }
   };
 
   const handleToggleNotifications = async () => {
@@ -76,8 +84,8 @@ export default function ProfileScreen() {
             "isLoggedIn",
             "currentUserId",
           ]);
-          router.replace("/(auth)/login");
           setIsProcessing(false);
+          router.replace("/(auth)/login");
         },
       },
     ]);

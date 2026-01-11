@@ -4,6 +4,8 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 
 export default function HelpScreen() {
+  const currentYear = new Date().getFullYear();
+
   return (
     <ThemedView style={styles.container}>
       <ThemedView style={styles.header}>
@@ -43,7 +45,7 @@ export default function HelpScreen() {
         </ThemedView>
       </ThemedView>
       <ThemedText style={styles.footer}>
-        © 2024 JiraMobile Clone. All rights reserved.
+        © {currentYear} JiraMobile Clone. All rights reserved.
       </ThemedText>
     </ThemedView>
   );

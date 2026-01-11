@@ -311,6 +311,13 @@ export default function ProjectViewScreen() {
 
   const handleCreateVersion = async () => {
     if (!normalizedProjectId || !newVersionName) return;
+    if (newVersionDate) {
+      const parsedDate = new Date(newVersionDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        Alert.alert("日付形式エラー", "YYYY-MM-DD 形式で入力してください。");
+        return;
+      }
+    }
     await createVersion({
       projectId: normalizedProjectId,
       name: newVersionName,
