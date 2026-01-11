@@ -53,9 +53,9 @@
 
 - [x] Summary: 統計カード/チャート/ワークロード/エピック進捗を実装。
 - [x] Board: スイムレーン、クイックフィルタ、WIP制限、状態別作成を実装（ステータス移動はボタン操作）。
-- [x] Board: D&D操作の導入を検討（必要なら追加実装）。
+- [ ] Board: D&D操作の導入を検討（必要なら追加実装）。
 - [x] Backlog: スプリント作成/開始/完了、インライン作成、バックログ管理を実装。
-- [x] Backlog: D&D操作の導入を検討（必要なら追加実装）。
+- [ ] Backlog: D&D操作の導入を検討（必要なら追加実装）。
 - [x] Timeline: ズーム/期日編集可能なタイムラインを実装（期日編集は入力方式）。
 - [x] Releases: 期日/進捗/ステータス表示を追加。
 - [x] Automation: ルール一覧と監査ログのUIをWebと揃える。
@@ -63,11 +63,20 @@
   - 対象ファイル:
     - `apps/mobile/app/project/[projectId]/index.tsx`
     - `apps/web/src/components/Project/*`
+  - [ ] Summary/Board/Backlog のチャートや視覚表現をWebに合わせる（モバイルの簡易表示改善）。
+
+## Phase 5.5: Dashboardsのチャート/ガジェット表現の同等化
+
+- [ ] Webのチャート/ガジェット表現（Pie/Bar等）をモバイルに反映。
+  - 対象ファイル:
+    - `apps/mobile/app/(tabs)/dashboards.tsx`
+    - `apps/web/src/pages/Dashboards.tsx`
 
 ## Phase 6: Searchの同等化
 
 - [x] advanced切替UI、保存モーダル、課題カードUIをWebと揃える。
 - [x] 保存フィルタの挙動をWebに合わせる。
+  - [ ] IssueCard 相当のコンポーネント化とメタ情報（アイコン/説明/タグ）を追加。
   - 対象ファイル:
     - `apps/mobile/app/(tabs)/search.tsx`
     - `apps/web/src/pages/Search.tsx`
@@ -86,10 +95,13 @@
 - [x] Profile: アバター編集/通知トグル/言語/ログアウト/ヘルプ/確認ダイアログを追加。
 - [x] Help: カードUI/サポートCTAを追加。
 - [x] Setup: SetupWizardの強制表示挙動をモバイルに反映。
+  - [ ] Welcome/Login のレイアウトと文言をWebに合わせる。
   - 対象ファイル:
     - `apps/mobile/app/(tabs)/profile.tsx`
     - `apps/mobile/app/(tabs)/help.tsx`
     - `apps/mobile/app/setup.tsx`
+    - `apps/mobile/app/(auth)/welcome.tsx`
+    - `apps/mobile/app/(auth)/login.tsx`
     - `apps/mobile/app/index.tsx`
 
 ## Phase 9: ナビゲーション/グローバル導線
