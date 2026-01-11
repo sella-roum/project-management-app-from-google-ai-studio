@@ -58,6 +58,22 @@ type SQLiteRow = {
   executedAt?: string;
 };
 
+type NativeFile = {
+  uri: string;
+  name?: string;
+  type?: string;
+  mimeType?: string;
+  size?: number;
+};
+
+type WebFile = File;
+
+type CrossPlatformFile = WebFile | NativeFile;
+
+type UpdateIssueResult =
+  | { success: true; issue: Issue }
+  | { success: false; error: "not_found" | "invalid_transition"; message: string };
+
 const SEED_USERS: User[] = getSeedUsers();
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const normalizeSavedFilter = (filter: SavedFilter): SavedFilter => ({
@@ -100,8 +116,8 @@ export class SQLiteStorageAdapter implements AppStorage {
     this.issues = {
       listByProject: (projectId) => this.listIssuesInternal(projectId),
       create: (input) => this.createIssueInternal(input),
-      update: (id, patch) => this.updateIssueInternal(id, patch),
-      updateStatus: (id, status) => this.updateIssueInternal(id, { status }),
+      update: (id, patch) => this.updateIssue(id, patch),
+      updateStatus: (id, status) => this.updateIssueStatus(id, status),
       remove: (id) => this.removeIssueInternal(id),
       watchAll: (listener) => this.watchIssues(listener),
       watchById: (id, listener) => this.watchIssue(id, listener),
@@ -467,10 +483,14 @@ export class SQLiteStorageAdapter implements AppStorage {
   private updateIssueInternal = async (
     id: ID,
     patch: Partial<Issue>,
-  ): Promise<Issue | false | undefined> => {
+  ): Promise<UpdateIssueResult> => {
     const existing = await this.getIssueByIdInternal(id);
     if (!existing) {
-      return undefined;
+      return {
+        success: false,
+        error: "not_found",
+        message: `Issue not found: ${id}`,
+      };
     }
 
     if (patch.status && patch.status !== existing.status) {
@@ -478,11 +498,16 @@ export class SQLiteStorageAdapter implements AppStorage {
       const workflow = project?.workflowSettings || WORKFLOW_TRANSITIONS;
       const allowed = workflow[existing.status] || [];
       if (!allowed.includes(patch.status)) {
-        return false;
+        return {
+          success: false,
+          error: "invalid_transition",
+          message: `Invalid transition from ${existing.status} to ${patch.status}`,
+        };
       }
     }
 
     const currentUserId = this.getCurrentUserId();
+    let historyIndex = 0;
     const historyEntries: Array<{
       id: string;
       authorId: string;
@@ -495,8 +520,9 @@ export class SQLiteStorageAdapter implements AppStorage {
 
     for (const [key, value] of Object.entries(patch)) {
       if ((existing as any)[key] !== value) {
+        historyIndex += 1;
         historyEntries.push({
-          id: `h-${Date.now()}-${key}`,
+          id: `h-${Date.now()}-${historyIndex}-${key}`,
           authorId: currentUserId,
           field: key,
           from: (existing as any)[key],
@@ -542,7 +568,7 @@ export class SQLiteStorageAdapter implements AppStorage {
       await this.runAutomation("status_changed", updated);
     }
 
-    return updated;
+    return { success: true, issue: updated };
   };
 
   private removeIssueInternal = async (id: ID): Promise<void> => {
@@ -879,8 +905,12 @@ export class SQLiteStorageAdapter implements AppStorage {
   updateIssue = async (
     id: string,
     updates: Partial<Issue>,
-  ): Promise<Issue | false | undefined> =>
-    this.updateIssueInternal(id, updates);
+  ): Promise<Issue | false | undefined> => {
+    const result = await this.updateIssueInternal(id, updates);
+    if (result.success) return result.issue;
+    if (result.error === "invalid_transition") return false;
+    return undefined;
+  };
 
   getIssuesForUser = async (userId: string): Promise<Issue[]> => {
     const issues = await this.queryAll<Issue>("SELECT data FROM issues");
@@ -890,8 +920,12 @@ export class SQLiteStorageAdapter implements AppStorage {
   updateIssueStatus = async (
     id: string,
     status: IssueStatus,
-  ): Promise<Issue | false | undefined> =>
-    this.updateIssueInternal(id, { status });
+  ): Promise<Issue | false | undefined> => {
+    const result = await this.updateIssueInternal(id, { status });
+    if (result.success) return result.issue;
+    if (result.error === "invalid_transition") return false;
+    return undefined;
+  };
 
   deleteIssue = async (id: string): Promise<void> =>
     this.deleteIssueInternal(id);
@@ -907,16 +941,26 @@ export class SQLiteStorageAdapter implements AppStorage {
     await this.removeIssueInternal(id);
   };
 
-  addAttachment = async (issueId: string, file: File): Promise<void> => {
+  addAttachment = async (
+    issueId: string,
+    file: CrossPlatformFile,
+  ): Promise<void> => {
     const issue = await this.getIssueByIdInternal(issueId);
     if (!issue) return;
+
+    const fileName = file.name ?? "attachment";
+    const fileType =
+      file.type ??
+      ("mimeType" in file ? file.mimeType : undefined) ??
+      "application/octet-stream";
+    const fileSize = file.size ?? 0;
 
     const addAttachmentData = async (data: string) => {
       const newAttachment: Attachment = {
         id: `at-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        fileName: (file as any).name || "attachment",
-        fileType: (file as any).type || "application/octet-stream",
-        fileSize: (file as any).size || 0,
+        fileName,
+        fileType,
+        fileSize,
         data,
         createdAt: new Date().toISOString(),
       };
@@ -929,10 +973,21 @@ export class SQLiteStorageAdapter implements AppStorage {
       await this.updateIssueRow(updated);
     };
 
+    const isWebFile = (input: CrossPlatformFile): input is WebFile =>
+      typeof File !== "undefined" && input instanceof File;
+    const isNativeFile = (input: CrossPlatformFile): input is NativeFile =>
+      "uri" in input && typeof input.uri === "string";
+
     if (typeof FileReader === "undefined") {
-      const uri = (file as any).uri;
-      if (typeof uri === "string") {
-        await addAttachmentData(uri);
+      if (isNativeFile(file)) {
+        await addAttachmentData(file.uri);
+      }
+      return;
+    }
+
+    if (!isWebFile(file)) {
+      if (isNativeFile(file)) {
+        await addAttachmentData(file.uri);
       }
       return;
     }

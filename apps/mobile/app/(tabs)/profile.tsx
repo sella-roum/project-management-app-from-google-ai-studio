@@ -59,6 +59,10 @@ export default function ProfileScreen() {
     const trimmedEmail = email.trim();
     const trimmedAvatarUrl = avatarUrl.trim();
 
+    if (!trimmedName) {
+      Alert.alert("入力エラー", "名前は必須です。");
+      return;
+    }
     if (
       trimmedEmail &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)

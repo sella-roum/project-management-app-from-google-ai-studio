@@ -78,8 +78,10 @@ export const updateIssueStatus = (
   status: Parameters<typeof storage.updateIssueStatus>[1],
 ) => storage.updateIssueStatus(id, status);
 export const deleteIssue = (id: string) => storage.deleteIssue(id);
-export const addAttachment = (issueId: string, file: File) =>
-  storage.addAttachment(issueId, file);
+export const addAttachment = (
+  issueId: string,
+  file: Parameters<typeof storage.addAttachment>[1],
+) => storage.addAttachment(issueId, file);
 export const addComment = (id: string, text: string) =>
   storage.addComment(id, text);
 export const getSubtasks = (parentId: string) => storage.getSubtasks(parentId);

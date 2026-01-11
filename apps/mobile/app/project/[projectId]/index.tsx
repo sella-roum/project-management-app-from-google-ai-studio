@@ -252,16 +252,11 @@ export default function ProjectViewScreen() {
   }, [selectedRuleId]);
 
   useEffect(() => {
-    setDueDateDrafts((prev) => {
-      const next = { ...prev };
-      issues.forEach((issue) => {
-        const value = issue.dueDate ? issue.dueDate.slice(0, 10) : "";
-        if (next[issue.id] !== value) {
-          next[issue.id] = value;
-        }
-      });
-      return next;
+    const next: Record<string, string> = {};
+    issues.forEach((issue) => {
+      next[issue.id] = issue.dueDate ? issue.dueDate.slice(0, 10) : "";
     });
+    setDueDateDrafts(next);
   }, [issues]);
 
   useEffect(() => {
@@ -479,13 +474,21 @@ export default function ProjectViewScreen() {
   };
 
   const handleMoveIssue = async (issueId: string, status: IssueStatus) => {
-    const result = await updateIssueStatus(issueId, status);
-    if (!result) {
-      Alert.alert("ステータス変更不可", "この遷移は許可されていません。");
-      return;
+    try {
+      const result = await updateIssueStatus(issueId, status);
+      if (!result) {
+        Alert.alert("ステータス変更不可", "この遷移は許可されていません。");
+        return;
+      }
+      await reload();
+    } catch (error) {
+      console.error("Failed to move issue", error);
+      const message =
+        error instanceof Error ? error.message : "不明なエラーが発生しました。";
+      Alert.alert("エラー", message);
+    } finally {
+      setActiveMoveIssueId(null);
     }
-    setActiveMoveIssueId(null);
-    await reload();
   };
 
   const handleCreateSprint = async () => {
@@ -510,6 +513,7 @@ export default function ProjectViewScreen() {
       (issue) => issue.sprintId === completeSprint.id && issue.status !== "Done",
     );
     let targetSprintId: string | undefined;
+    let completed = false;
     try {
       if (completeDestination === "next") {
         const newSprint = await createSprint(normalizedProjectId);
@@ -519,17 +523,22 @@ export default function ProjectViewScreen() {
         updateIssue(issue.id, { sprintId: targetSprintId }),
       );
       await Promise.all(updates);
+      await updateSprintStatus(completeSprint.id, "completed");
+      await reload();
+      completed = true;
     } catch (error) {
       console.error("Failed to complete sprint", error);
+      const message =
+        error instanceof Error ? error.message : "不明なエラーが発生しました。";
       Alert.alert(
         "完了エラー",
-        "スプリント完了の処理に失敗しました。もう一度お試しください。",
+        message,
       );
-      return;
+    } finally {
+      if (completed) {
+        setCompleteSprint(null);
+      }
     }
-    await updateSprintStatus(completeSprint.id, "completed");
-    setCompleteSprint(null);
-    await reload();
   };
 
   const handleInlineSprintCreate = async (sprintId?: string) => {
@@ -550,9 +559,17 @@ export default function ProjectViewScreen() {
     issueId: string,
     sprintId?: string,
   ) => {
-    await updateIssue(issueId, { sprintId });
-    setMoveSprintIssueId(null);
-    await reload();
+    try {
+      await updateIssue(issueId, { sprintId });
+      await reload();
+    } catch (error) {
+      console.error("Failed to move issue to sprint", error);
+      const message =
+        error instanceof Error ? error.message : "不明なエラーが発生しました。";
+      Alert.alert("エラー", message);
+    } finally {
+      setMoveSprintIssueId(null);
+    }
   };
 
   const handleDueDateChange = (issueId: string, value: string) => {
@@ -612,7 +629,7 @@ export default function ProjectViewScreen() {
     }));
   };
 
-  const currentUserId = getCurrentUserId();
+  const currentUserId = useMemo(() => getCurrentUserId(), []);
 
   const filteredIssues = useMemo(() => {
     let result = [...issues];
