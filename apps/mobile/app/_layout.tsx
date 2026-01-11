@@ -12,16 +12,24 @@ export default function RootLayout() {
   useEffect(() => {
     let active = true;
     const checkSetup = async () => {
-      const entries = await AsyncStorage.multiGet([
-        "isLoggedIn",
-        "hasSetup",
-      ]);
-      if (!active) return;
-      const values = new Map(entries);
-      const isLoggedIn = values.get("isLoggedIn") === "true";
-      const hasSetup = values.get("hasSetup") === "true";
-      const isAuthFlow = segments.includes("(auth)") || segments.includes("setup");
-      setShowSetupWizard(isLoggedIn && !hasSetup && !isAuthFlow);
+      try {
+        const entries = await AsyncStorage.multiGet([
+          "isLoggedIn",
+          "hasSetup",
+        ]);
+        if (!active) return;
+        const values = new Map(entries);
+        const isLoggedIn = values.get("isLoggedIn") === "true";
+        const hasSetup = values.get("hasSetup") === "true";
+        const isAuthFlow =
+          segments.includes("(auth)") || segments.includes("setup");
+        setShowSetupWizard(isLoggedIn && !hasSetup && !isAuthFlow);
+      } catch (error) {
+        console.error("Failed to load setup state", error);
+        if (active) {
+          setShowSetupWizard(false);
+        }
+      }
     };
     void checkSetup();
     return () => {

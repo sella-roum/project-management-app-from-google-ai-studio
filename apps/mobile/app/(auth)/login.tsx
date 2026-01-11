@@ -15,7 +15,6 @@ import { ThemedView } from "@/components/themed-view";
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -85,16 +84,6 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-          />
-        </ThemedView>
-        <ThemedView style={styles.field}>
-          <ThemedText style={styles.label}>パスワード (任意)</ThemedText>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
           />
         </ThemedView>
         <Pressable

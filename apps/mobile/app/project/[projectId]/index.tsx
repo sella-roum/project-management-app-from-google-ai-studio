@@ -311,17 +311,19 @@ export default function ProjectViewScreen() {
 
   const handleCreateVersion = async () => {
     if (!normalizedProjectId || !newVersionName) return;
+    let releaseDate: string | undefined;
     if (newVersionDate) {
       const parsedDate = new Date(newVersionDate);
       if (Number.isNaN(parsedDate.getTime())) {
         Alert.alert("日付形式エラー", "YYYY-MM-DD 形式で入力してください。");
         return;
       }
+      releaseDate = parsedDate.toISOString();
     }
     await createVersion({
       projectId: normalizedProjectId,
       name: newVersionName,
-      releaseDate: newVersionDate || undefined,
+      releaseDate,
     });
     setNewVersionName("");
     setNewVersionDate("");
@@ -807,9 +809,14 @@ export default function ProjectViewScreen() {
                   (issue) => issue.status === status,
                 );
                 const order = boardOrder[status] ?? [];
-                const orderedIssues = [...columnIssues].sort(
-                  (a, b) => order.indexOf(a.id) - order.indexOf(b.id),
+                const orderIndex = new Map(
+                  order.map((id, index) => [id, index]),
                 );
+                const orderedIssues = [...columnIssues].sort((a, b) => {
+                  const aIndex = orderIndex.get(a.id) ?? order.length;
+                  const bIndex = orderIndex.get(b.id) ?? order.length;
+                  return aIndex - bIndex;
+                });
                 const limit = project?.columnSettings?.[status]?.limit;
                 const isOverLimit = Boolean(limit && columnIssues.length > limit);
 
@@ -987,10 +994,17 @@ export default function ProjectViewScreen() {
                   );
                   const sprintIssueOrder =
                     sprintOrder[sprint.id] ?? sprintIssues.map((issue) => issue.id);
+                  const sprintOrderIndex = new Map(
+                    sprintIssueOrder.map((id, index) => [id, index]),
+                  );
                   const orderedSprintIssues = [...sprintIssues].sort(
-                    (a, b) =>
-                      sprintIssueOrder.indexOf(a.id) -
-                      sprintIssueOrder.indexOf(b.id),
+                    (a, b) => {
+                      const aIndex =
+                        sprintOrderIndex.get(a.id) ?? sprintIssueOrder.length;
+                      const bIndex =
+                        sprintOrderIndex.get(b.id) ?? sprintIssueOrder.length;
+                      return aIndex - bIndex;
+                    },
                   );
                   const backlogTargetId =
                     backlogSprint.id === "backlog"

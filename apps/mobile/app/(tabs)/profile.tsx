@@ -46,6 +46,7 @@ export default function ProfileScreen() {
   const handleSave = async () => {
     const user = await getCurrentUser();
     if (!user) return;
+    setIsProcessing(true);
     try {
       await updateUser(user.id, { name, email, avatarUrl });
       setIsEditing(false);
@@ -55,13 +56,26 @@ export default function ProfileScreen() {
         "保存エラー",
         "プロフィールの更新に失敗しました。もう一度お試しください。",
       );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleToggleNotifications = async () => {
     const next = !notificationsEnabled;
-    setNotificationsEnabled(next);
-    await AsyncStorage.setItem("notificationsEnabled", String(next));
+    setIsProcessing(true);
+    try {
+      await AsyncStorage.setItem("notificationsEnabled", String(next));
+      setNotificationsEnabled(next);
+    } catch (error) {
+      console.error("Failed to update notifications", error);
+      Alert.alert(
+        "更新エラー",
+        "通知設定の更新に失敗しました。もう一度お試しください。",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleLanguage = () => {
@@ -80,12 +94,21 @@ export default function ProfileScreen() {
         style: "destructive",
         onPress: async () => {
           setIsProcessing(true);
-          await AsyncStorage.multiRemove([
-            "isLoggedIn",
-            "currentUserId",
-          ]);
-          setIsProcessing(false);
-          router.replace("/(auth)/login");
+          try {
+            await AsyncStorage.multiRemove([
+              "isLoggedIn",
+              "currentUserId",
+            ]);
+            setIsProcessing(false);
+            router.replace("/(auth)/login");
+          } catch (error) {
+            console.error("Failed to log out", error);
+            Alert.alert(
+              "ログアウトエラー",
+              "ログアウトに失敗しました。もう一度お試しください。",
+            );
+            setIsProcessing(false);
+          }
         },
       },
     ]);
@@ -102,14 +125,23 @@ export default function ProfileScreen() {
           style: "destructive",
           onPress: async () => {
             setIsProcessing(true);
-            await reset();
-            await AsyncStorage.multiRemove([
-              "isLoggedIn",
-              "currentUserId",
-              "hasSetup",
-            ]);
-            router.replace("/(auth)/welcome");
-            setIsProcessing(false);
+            try {
+              await reset();
+              await AsyncStorage.multiRemove([
+                "isLoggedIn",
+                "currentUserId",
+                "hasSetup",
+              ]);
+              router.replace("/(auth)/welcome");
+              setIsProcessing(false);
+            } catch (error) {
+              console.error("Failed to reset app", error);
+              Alert.alert(
+                "初期化エラー",
+                "初期化に失敗しました。もう一度お試しください。",
+              );
+              setIsProcessing(false);
+            }
           },
         },
       ],

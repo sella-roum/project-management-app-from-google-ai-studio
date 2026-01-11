@@ -49,7 +49,18 @@ export default function DashboardsScreen() {
       if (!active) return;
       if (stored) {
         try {
-          setActiveGadgetIds(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          const valid =
+            Array.isArray(parsed) &&
+            parsed.every((item) =>
+              ["status", "progress", "bugs", "due"].includes(item),
+            );
+          if (valid) {
+            setActiveGadgetIds(parsed);
+          } else {
+            setActiveGadgetIds(["status", "progress", "bugs"]);
+            await AsyncStorage.removeItem(`dashboard_gadgets_${userId}`);
+          }
         } catch (error) {
           console.error("Failed to parse dashboard config", error);
           setActiveGadgetIds(["status", "progress", "bugs"]);

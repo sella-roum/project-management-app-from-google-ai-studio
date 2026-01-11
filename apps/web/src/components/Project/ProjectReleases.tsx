@@ -18,10 +18,19 @@ export const ProjectReleases: React.FC<Props> = ({ project, issues }) => {
 
   const handleCreate = async () => {
     if (!newName) return;
+    let releaseDate: string | undefined;
+    if (newDate) {
+      const parsedDate = new Date(newDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        alert("YYYY-MM-DD 形式で入力してください。");
+        return;
+      }
+      releaseDate = parsedDate.toISOString();
+    }
     await createVersion({
       projectId: project.id,
       name: newName,
-      releaseDate: newDate || undefined,
+      releaseDate,
     });
     setNewName("");
     setNewDate("");

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -342,7 +343,11 @@ export default function SearchScreen() {
         </ThemedView>
       )}
 
-      {saveModalOpen ? (
+      <Modal
+        transparent
+        visible={saveModalOpen}
+        onRequestClose={() => setSaveModalOpen(false)}
+      >
         <ThemedView style={styles.modalOverlay}>
           <ThemedView style={styles.modalCard}>
             <ThemedText type="subtitle">保存済みフィルタ</ThemedText>
@@ -365,7 +370,7 @@ export default function SearchScreen() {
             </ThemedView>
           </ThemedView>
         </ThemedView>
-      ) : null}
+      </Modal>
     </ScrollView>
   );
 }
