@@ -510,17 +510,22 @@ export default function ProjectViewScreen() {
       (issue) => issue.sprintId === completeSprint.id && issue.status !== "Done",
     );
     let targetSprintId: string | undefined;
-    if (completeDestination === "next") {
-      const newSprint = await createSprint(normalizedProjectId);
-      targetSprintId = newSprint.id;
-    }
-    const updates = incomplete.map((issue) =>
-      updateIssue(issue.id, { sprintId: targetSprintId }),
-    );
     try {
+      if (completeDestination === "next") {
+        const newSprint = await createSprint(normalizedProjectId);
+        targetSprintId = newSprint.id;
+      }
+      const updates = incomplete.map((issue) =>
+        updateIssue(issue.id, { sprintId: targetSprintId }),
+      );
       await Promise.all(updates);
     } catch (error) {
-      console.error("Failed to move sprint issues", error);
+      console.error("Failed to complete sprint", error);
+      Alert.alert(
+        "完了エラー",
+        "スプリント完了の処理に失敗しました。もう一度お試しください。",
+      );
+      return;
     }
     await updateSprintStatus(completeSprint.id, "completed");
     setCompleteSprint(null);

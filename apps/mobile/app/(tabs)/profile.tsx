@@ -20,6 +20,7 @@ export default function ProfileScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [imageError, setImageError] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [stats, setStats] = useState({ assigned: 0, reported: 0, leading: 0 });
 
@@ -39,6 +40,10 @@ export default function ProfileScreen() {
   }, [ready]);
 
   useEffect(() => {
+    setImageError(false);
+  }, [avatarUrl]);
+
+  useEffect(() => {
     const loadNotifications = async () => {
       const stored = await AsyncStorage.getItem("notificationsEnabled");
       setNotificationsEnabled(stored !== "false");
@@ -50,9 +55,40 @@ export default function ProfileScreen() {
     if (isProcessing) return;
     const user = await getCurrentUser();
     if (!user) return;
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedAvatarUrl = avatarUrl.trim();
+
+    if (
+      trimmedEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)
+    ) {
+      Alert.alert("入力エラー", "正しいメールアドレスを入力してください。");
+      return;
+    }
+    if (trimmedAvatarUrl) {
+      try {
+        const url = new URL(trimmedAvatarUrl);
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+          Alert.alert("入力エラー", "URLはhttp/https形式で入力してください。");
+          return;
+        }
+      } catch {
+        Alert.alert("入力エラー", "正しいURLを入力してください。");
+        return;
+      }
+    }
+
     setIsProcessing(true);
     try {
-      await updateUser(user.id, { name, email, avatarUrl });
+      await updateUser(user.id, {
+        name: trimmedName,
+        email: trimmedEmail || undefined,
+        avatarUrl: trimmedAvatarUrl,
+      });
+      setName(trimmedName);
+      setEmail(trimmedEmail);
+      setAvatarUrl(trimmedAvatarUrl);
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to save profile", error);
@@ -189,8 +225,12 @@ export default function ProfileScreen() {
 
       <ThemedView style={styles.profileCard}>
         <ThemedView style={styles.avatar}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          {avatarUrl && !imageError ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.avatarImage}
+              onError={() => setImageError(true)}
+            />
           ) : (
             <ThemedText style={styles.avatarText}>
               {name ? name.charAt(0) : "U"}

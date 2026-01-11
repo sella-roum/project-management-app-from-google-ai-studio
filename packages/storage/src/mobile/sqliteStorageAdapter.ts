@@ -152,9 +152,11 @@ export class SQLiteStorageAdapter implements AppStorage {
       CREATE INDEX IF NOT EXISTS sprints_project_id ON sprints (projectId);
       CREATE TABLE IF NOT EXISTS notifications (
         id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT,
         read INTEGER NOT NULL DEFAULT 0,
         data TEXT NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS notifications_user ON notifications (userId);
       CREATE TABLE IF NOT EXISTS view_history (
         id TEXT PRIMARY KEY NOT NULL,
         userId TEXT NOT NULL,
@@ -198,6 +200,7 @@ export class SQLiteStorageAdapter implements AppStorage {
     } else {
       await this.settings.set("currentUserId", this.currentUserId);
     }
+    await this.ensureNotificationUserIdColumn(db);
   }
 
   private async getDb(): Promise<SQLite.SQLiteDatabase> {
@@ -230,6 +233,27 @@ export class SQLiteStorageAdapter implements AppStorage {
   private async setCurrentUserId(id: string): Promise<void> {
     this.currentUserId = id;
     await this.settings.set("currentUserId", id);
+  }
+
+  private async ensureNotificationUserIdColumn(
+    db: SQLite.SQLiteDatabase,
+  ): Promise<void> {
+    const columns = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(notifications)",
+    );
+    const hasUserId = columns.some((column) => column.name === "userId");
+    if (!hasUserId) {
+      await db.execAsync("ALTER TABLE notifications ADD COLUMN userId TEXT");
+    }
+    await db.execAsync(
+      "CREATE INDEX IF NOT EXISTS notifications_user ON notifications (userId)",
+    );
+    if (this.currentUserId) {
+      await db.runAsync(
+        "UPDATE notifications SET userId = ? WHERE userId IS NULL",
+        [this.currentUserId],
+      );
+    }
   }
 
   private async queryAll<T>(
@@ -499,21 +523,17 @@ export class SQLiteStorageAdapter implements AppStorage {
       if ((existing as any)[key] === value) continue;
       if (key === "assigneeId" && value && value !== currentUserId) {
         await this.dispatchProjectNotification(
-          existing.projectId,
+          updated.projectId,
           "issue_assigned",
-          existing,
+          updated,
         );
       }
       if (key === "status") {
         const event = value === "Done" ? "issue_resolved" : "status_changed";
-        const updatedObj = {
-          ...existing,
-          status: value as IssueStatus,
-        };
         await this.dispatchProjectNotification(
-          existing.projectId,
+          updated.projectId,
           event,
-          updatedObj as Issue,
+          updated,
         );
       }
     }
@@ -642,7 +662,7 @@ export class SQLiteStorageAdapter implements AppStorage {
   }
 
   private async createNotificationInternal(
-    notification: Partial<Notification> & { issueId?: string },
+    notification: Partial<Notification> & { issueId?: string; userId: string },
   ): Promise<void> {
     const db = await this.getDb();
     const createdAt = new Date().toISOString();
@@ -656,8 +676,8 @@ export class SQLiteStorageAdapter implements AppStorage {
       issueId: notification.issueId,
     };
     await db.runAsync(
-      "INSERT OR REPLACE INTO notifications (id, read, data) VALUES (?, ?, ?)",
-      [data.id, data.read ? 1 : 0, JSON.stringify(data)],
+      "INSERT OR REPLACE INTO notifications (id, userId, read, data) VALUES (?, ?, ?, ?)",
+      [data.id, notification.userId, data.read ? 1 : 0, JSON.stringify(data)],
     );
   }
 
@@ -706,8 +726,8 @@ export class SQLiteStorageAdapter implements AppStorage {
     }
 
     for (const _userId of targetUserIds) {
-      void _userId;
       await this.createNotificationInternal({
+        userId: _userId,
         title,
         description,
         type: event === "comment_added" ? "mention" : "system",
@@ -879,8 +899,11 @@ export class SQLiteStorageAdapter implements AppStorage {
   private deleteIssueInternal = async (id: ID): Promise<void> => {
     const issue = await this.getIssueByIdInternal(id);
     if (!issue) return;
+    const project = await this.getProjectByIdInternal(issue.projectId);
     const currentUserId = this.getCurrentUserId();
-    if (!this.hasPermission(currentUserId, "delete_issue")) return;
+    if (!this.hasPermission(currentUserId, "delete_issue", project ?? undefined)) {
+      throw new Error("Permission denied: delete_issue");
+    }
     await this.removeIssueInternal(id);
   };
 
@@ -1368,9 +1391,10 @@ export class SQLiteStorageAdapter implements AppStorage {
     const notifications = getSeedNotifications(nowIso);
     for (const notification of notifications) {
       await db.runAsync(
-        "INSERT OR REPLACE INTO notifications (id, read, data) VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO notifications (id, userId, read, data) VALUES (?, ?, ?, ?)",
         [
           notification.id,
+          this.getCurrentUserId(),
           notification.read ? 1 : 0,
           JSON.stringify(notification),
         ],
