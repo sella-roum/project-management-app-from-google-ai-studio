@@ -8,7 +8,7 @@ import {
 import { useRouter } from "expo-router";
 
 import type { Issue } from "@repo/core";
-import { PRIORITY_LABELS, STATUS_LABELS, TYPE_LABELS, executeJQL } from "@repo/core";
+import { executeJQL } from "@repo/core";
 import {
   getCurrentUserId,
   getIssues,
@@ -21,6 +21,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { IssueCard } from "@/components/issue-card";
 import { useStorageReady } from "@/hooks/use-storage";
 
 export default function SearchScreen() {
@@ -328,27 +329,11 @@ export default function SearchScreen() {
             結果: {filteredIssues.length}件
           </ThemedText>
           {filteredIssues.map((issue) => (
-            <Pressable
+            <IssueCard
               key={issue.id}
+              issue={issue}
               onPress={() => router.push(`/issue/${issue.id}`)}
-              style={styles.card}
-            >
-              <ThemedView style={styles.rowBetween}>
-                <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
-                <ThemedText style={styles.metaText}>
-                  {STATUS_LABELS[issue.status]}
-                </ThemedText>
-              </ThemedView>
-              <ThemedText numberOfLines={2}>{issue.title}</ThemedText>
-              <ThemedView style={styles.metaRow}>
-                <ThemedText style={styles.metaBadge}>
-                  {TYPE_LABELS[issue.type]}
-                </ThemedText>
-                <ThemedText style={styles.metaBadge}>
-                  {PRIORITY_LABELS[issue.priority]}
-                </ThemedText>
-              </ThemedView>
-            </Pressable>
+            />
           ))}
           {!ready ? <ThemedText>Loading...</ThemedText> : null}
           {ready && filteredIssues.length === 0 ? (
@@ -392,11 +377,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 24,
   },
-  card: {
-    borderRadius: 12,
-    gap: 4,
-    padding: 12,
-  },
   filterActive: {
     borderColor: "#2563eb",
   },
@@ -425,17 +405,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
   },
-  metaBadge: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 999,
-    fontSize: 11,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  metaRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
   metaText: {
     color: "#6b7280",
     fontSize: 12,
@@ -454,10 +423,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 0,
-  },
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
   },
   secondaryButton: {
     alignItems: "center",

@@ -63,6 +63,13 @@ const TABS = [
   "Settings",
 ] as const;
 
+const BOARD_STATUSES: IssueStatus[] = [
+  "To Do",
+  "In Progress",
+  "In Review",
+  "Done",
+];
+
 export default function ProjectViewScreen() {
   const ready = useStorageReady();
   const router = useRouter();
@@ -80,14 +87,21 @@ export default function ProjectViewScreen() {
   const [boardSwimlane, setBoardSwimlane] = useState<
     "none" | "assignee"
   >("none");
-  const [boardFilters, setBoardFilters] = useState<Array<"mine" | "recent">>(
-    [],
-  );
+  const [boardFilters, setBoardFilters] = useState<("mine" | "recent")[]>([]);
   const [inlineCreateStatus, setInlineCreateStatus] = useState<IssueStatus | null>(
     null,
   );
   const [inlineCreateTitle, setInlineCreateTitle] = useState("");
   const [activeMoveIssueId, setActiveMoveIssueId] = useState<string | null>(null);
+  const [boardOrder, setBoardOrder] = useState<Record<IssueStatus, string[]>>(
+    () => ({
+      "To Do": [],
+      "In Progress": [],
+      "In Review": [],
+      Done: [],
+    }),
+  );
+  const [sprintOrder, setSprintOrder] = useState<Record<string, string[]>>({});
   const [inlineSprintId, setInlineSprintId] = useState<string | null>(null);
   const [inlineSprintTitle, setInlineSprintTitle] = useState("");
   const [completeSprint, setCompleteSprint] = useState<Sprint | null>(null);
@@ -233,6 +247,36 @@ export default function ProjectViewScreen() {
       return next;
     });
   }, [issues]);
+
+  useEffect(() => {
+    if (!issues.length) return;
+    setBoardOrder((prev) => {
+      const next: Record<IssueStatus, string[]> = { ...prev };
+      BOARD_STATUSES.forEach((status) => {
+        const ids = issues.filter((issue) => issue.status === status).map((issue) => issue.id);
+        const ordered = (next[status] ?? []).filter((id) => ids.includes(id));
+        const missing = ids.filter((id) => !ordered.includes(id));
+        next[status] = [...ordered, ...missing];
+      });
+      return next;
+    });
+    setSprintOrder((prev) => {
+      const next = { ...prev };
+      sprints.forEach((sprint) => {
+        const ids = issues
+          .filter((issue) =>
+            sprint.name.includes("バックログ")
+              ? !issue.sprintId || issue.sprintId === sprint.id
+              : issue.sprintId === sprint.id,
+          )
+          .map((issue) => issue.id);
+        const ordered = (next[sprint.id] ?? []).filter((id) => ids.includes(id));
+        const missing = ids.filter((id) => !ordered.includes(id));
+        next[sprint.id] = [...ordered, ...missing];
+      });
+      return next;
+    });
+  }, [issues, sprints]);
 
   const handleSaveDetails = async () => {
     if (!normalizedProjectId) return;
@@ -481,13 +525,44 @@ export default function ProjectViewScreen() {
     await reload();
   };
 
+  const moveInOrder = (
+    order: string[],
+    issueId: string,
+    direction: "up" | "down",
+  ) => {
+    const index = order.indexOf(issueId);
+    if (index === -1) return order;
+    const nextIndex = direction === "up" ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= order.length) return order;
+    const next = [...order];
+    const [moved] = next.splice(index, 1);
+    next.splice(nextIndex, 0, moved);
+    return next;
+  };
+
+  const moveIssueInBoard = (
+    status: IssueStatus,
+    issueId: string,
+    direction: "up" | "down",
+  ) => {
+    setBoardOrder((prev) => ({
+      ...prev,
+      [status]: moveInOrder(prev[status] ?? [], issueId, direction),
+    }));
+  };
+
+  const moveIssueInSprint = (
+    sprintId: string,
+    issueId: string,
+    direction: "up" | "down",
+  ) => {
+    setSprintOrder((prev) => ({
+      ...prev,
+      [sprintId]: moveInOrder(prev[sprintId] ?? [], issueId, direction),
+    }));
+  };
+
   const currentUserId = getCurrentUserId();
-  const boardStatuses: IssueStatus[] = [
-    "To Do",
-    "In Progress",
-    "In Review",
-    "Done",
-  ];
 
   const filteredIssues = useMemo(() => {
     let result = [...issues];
@@ -720,9 +795,13 @@ export default function ProjectViewScreen() {
                   </Pressable>
                 </ThemedView>
               </ThemedView>
-              {boardStatuses.map((status) => {
+              {BOARD_STATUSES.map((status) => {
                 const columnIssues = filteredIssues.filter(
                   (issue) => issue.status === status,
+                );
+                const order = boardOrder[status] ?? [];
+                const orderedIssues = [...columnIssues].sort(
+                  (a, b) => order.indexOf(a.id) - order.indexOf(b.id),
                 );
                 const limit = project?.columnSettings?.[status]?.limit;
                 const isOverLimit = Boolean(limit && columnIssues.length > limit);
@@ -747,18 +826,32 @@ export default function ProjectViewScreen() {
                         <ThemedText style={styles.metaText}>
                           {assigneeName}
                         </ThemedText>
-                        <Pressable
-                          onPress={() =>
-                            setActiveMoveIssueId(
-                              activeMoveIssueId === issue.id
-                                ? null
-                                : issue.id,
-                            )
-                          }
-                          style={styles.ghostBtnSmall}
-                        >
-                          <ThemedText>移動</ThemedText>
-                        </Pressable>
+                        <ThemedView style={styles.row}>
+                          <Pressable
+                            onPress={() => moveIssueInBoard(status, issue.id, "up")}
+                            style={styles.ghostBtnSmall}
+                          >
+                            <ThemedText>↑</ThemedText>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => moveIssueInBoard(status, issue.id, "down")}
+                            style={styles.ghostBtnSmall}
+                          >
+                            <ThemedText>↓</ThemedText>
+                          </Pressable>
+                          <Pressable
+                            onPress={() =>
+                              setActiveMoveIssueId(
+                                activeMoveIssueId === issue.id
+                                  ? null
+                                  : issue.id,
+                              )
+                            }
+                            style={styles.ghostBtnSmall}
+                          >
+                            <ThemedText>移動</ThemedText>
+                          </Pressable>
+                        </ThemedView>
                       </ThemedView>
                       {activeMoveIssueId === issue.id && allowed.length > 0 ? (
                         <ThemedView style={styles.rowWrap}>
@@ -798,10 +891,10 @@ export default function ProjectViewScreen() {
                       swimlanes.map((lane) => {
                         const laneIssues =
                           lane.id === "unassigned"
-                            ? columnIssues.filter((i) => !i.assigneeId)
+                            ? orderedIssues.filter((i) => !i.assigneeId)
                             : lane.id === "all"
-                              ? columnIssues
-                              : columnIssues.filter(
+                              ? orderedIssues
+                              : orderedIssues.filter(
                                   (i) => i.assigneeId === lane.id,
                                 );
                         if (laneIssues.length === 0) return null;
@@ -817,12 +910,12 @@ export default function ProjectViewScreen() {
                           </ThemedView>
                         );
                       })
-                    ) : columnIssues.length === 0 ? (
+                    ) : orderedIssues.length === 0 ? (
                       <ThemedText style={styles.metaText}>
                         課題はありません。
                       </ThemedText>
                     ) : (
-                      columnIssues.map(renderIssue)
+                      orderedIssues.map(renderIssue)
                     )}
 
                     {status === "To Do" ? (
@@ -885,6 +978,13 @@ export default function ProjectViewScreen() {
                       ? !issue.sprintId || issue.sprintId === sprint.id
                       : issue.sprintId === sprint.id,
                   );
+                  const sprintIssueOrder =
+                    sprintOrder[sprint.id] ?? sprintIssues.map((issue) => issue.id);
+                  const orderedSprintIssues = [...sprintIssues].sort(
+                    (a, b) =>
+                      sprintIssueOrder.indexOf(a.id) -
+                      sprintIssueOrder.indexOf(b.id),
+                  );
                   const backlogTargetId =
                     backlogSprint.id === "backlog"
                       ? undefined
@@ -918,12 +1018,12 @@ export default function ProjectViewScreen() {
                         </ThemedView>
                       </ThemedView>
 
-                      {sprintIssues.length === 0 ? (
+                      {orderedSprintIssues.length === 0 ? (
                         <ThemedText style={styles.metaText}>
                           課題はありません。
                         </ThemedText>
                       ) : (
-                        sprintIssues.map((issue) => (
+                        orderedSprintIssues.map((issue) => (
                           <ThemedView key={issue.id} style={styles.issueCard}>
                             <Pressable
                               onPress={() => handleOpenIssue(issue.id)}
@@ -938,18 +1038,44 @@ export default function ProjectViewScreen() {
                               <ThemedText style={styles.metaText}>
                                 {STATUS_LABELS[issue.status]}
                               </ThemedText>
-                              <Pressable
-                                onPress={() =>
-                                  setMoveSprintIssueId(
-                                    moveSprintIssueId === issue.id
-                                      ? null
-                                      : issue.id,
-                                  )
-                                }
-                                style={styles.ghostBtnSmall}
-                              >
-                                <ThemedText>移動</ThemedText>
-                              </Pressable>
+                              <ThemedView style={styles.row}>
+                                <Pressable
+                                  onPress={() =>
+                                    moveIssueInSprint(
+                                      sprint.id,
+                                      issue.id,
+                                      "up",
+                                    )
+                                  }
+                                  style={styles.ghostBtnSmall}
+                                >
+                                  <ThemedText>↑</ThemedText>
+                                </Pressable>
+                                <Pressable
+                                  onPress={() =>
+                                    moveIssueInSprint(
+                                      sprint.id,
+                                      issue.id,
+                                      "down",
+                                    )
+                                  }
+                                  style={styles.ghostBtnSmall}
+                                >
+                                  <ThemedText>↓</ThemedText>
+                                </Pressable>
+                                <Pressable
+                                  onPress={() =>
+                                    setMoveSprintIssueId(
+                                      moveSprintIssueId === issue.id
+                                        ? null
+                                        : issue.id,
+                                    )
+                                  }
+                                  style={styles.ghostBtnSmall}
+                                >
+                                  <ThemedText>移動</ThemedText>
+                                </Pressable>
+                              </ThemedView>
                             </ThemedView>
                             {moveSprintIssueId === issue.id ? (
                               <ThemedView style={styles.rowWrap}>

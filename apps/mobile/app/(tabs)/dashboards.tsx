@@ -10,6 +10,8 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useStorageReady } from "@/hooks/use-storage";
 
+const CHART_COLORS = ["#0052CC", "#36B37E", "#FFAB00", "#FF5630", "#00B8D9"];
+
 export default function DashboardsScreen() {
   const ready = useStorageReady();
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -78,6 +80,11 @@ export default function DashboardsScreen() {
     }));
   }, [issues]);
 
+  const totalStatusCount = useMemo(
+    () => statusData.reduce((sum, item) => sum + item.value, 0),
+    [statusData],
+  );
+
   const projectData = useMemo(() => {
     return projects.map((project) => {
       const projectIssues = issues.filter((i) => i.projectId === project.id);
@@ -137,12 +144,46 @@ export default function DashboardsScreen() {
               {statusData.length === 0 ? (
                 <ThemedText style={styles.subtleText}>データがありません。</ThemedText>
               ) : (
-                statusData.map((item) => (
-                  <ThemedView key={item.label} style={styles.rowBetween}>
-                    <ThemedText>{item.label}</ThemedText>
-                    <ThemedText>{item.value}</ThemedText>
+                <>
+                  <ThemedView style={styles.pieBar}>
+                    {statusData.map((item, index) => {
+                      const percent =
+                        totalStatusCount > 0
+                          ? (item.value / totalStatusCount) * 100
+                          : 0;
+                      return (
+                        <ThemedView
+                          key={item.label}
+                          style={[
+                            styles.pieSegment,
+                            {
+                              backgroundColor:
+                                CHART_COLORS[index % CHART_COLORS.length],
+                              width: `${percent}%`,
+                            },
+                          ]}
+                        />
+                      );
+                    })}
                   </ThemedView>
-                ))
+                  {statusData.map((item, index) => (
+                    <ThemedView key={item.label} style={styles.rowBetween}>
+                      <ThemedView style={styles.row}>
+                        <ThemedView
+                          style={[
+                            styles.legendDot,
+                            {
+                              backgroundColor:
+                                CHART_COLORS[index % CHART_COLORS.length],
+                            },
+                          ]}
+                        />
+                        <ThemedText>{item.label}</ThemedText>
+                      </ThemedView>
+                      <ThemedText>{item.value}</ThemedText>
+                    </ThemedView>
+                  ))}
+                </>
               )}
             </ThemedView>
           ) : null}
@@ -312,6 +353,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 6,
   },
+  row: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -337,5 +383,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  legendDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  pieBar: {
+    borderRadius: 999,
+    flexDirection: "row",
+    height: 10,
+    overflow: "hidden",
+  },
+  pieSegment: {
+    height: 10,
   },
 });
