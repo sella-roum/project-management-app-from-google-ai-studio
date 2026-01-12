@@ -12,6 +12,8 @@ import {
   updateIssueStatus,
 } from "@repo/storage";
 
+import { EmptyState } from "@/components/empty-state";
+import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useStorageReady } from "@/hooks/use-storage";
@@ -72,7 +74,20 @@ export default function HomeScreen() {
       </ThemedView>
 
       {!ready ? (
-        <ThemedText>Preparing your workspace...</ThemedText>
+        <ThemedView style={styles.statsRow}>
+          <ThemedView style={styles.statCard}>
+            <Skeleton width={48} />
+            <Skeleton width={80} />
+          </ThemedView>
+          <ThemedView style={styles.statCard}>
+            <Skeleton width={48} />
+            <Skeleton width={80} />
+          </ThemedView>
+          <ThemedView style={styles.statCard}>
+            <Skeleton width={48} />
+            <Skeleton width={80} />
+          </ThemedView>
+        </ThemedView>
       ) : (
         <ThemedView style={styles.statsRow}>
           <ThemedView style={styles.statCard}>
@@ -126,7 +141,14 @@ export default function HomeScreen() {
           </Pressable>
         </ThemedView>
         {myIssues.length === 0 ? (
-          <ThemedText>すべて完了しました。</ThemedText>
+          <EmptyState
+            title="すべて完了しました"
+            description="新しい課題を作成して次のタスクに取り掛かりましょう。"
+            actionLabel="課題を作成"
+            onAction={() =>
+              router.push({ pathname: "/modal", params: { mode: "issue" } })
+            }
+          />
         ) : (
           myIssues.slice(0, 10).map((issue) => (
             <ThemedView key={issue.id} style={styles.card}>
@@ -154,6 +176,9 @@ export default function HomeScreen() {
       <ThemedView style={styles.section}>
         <Link href="/(tabs)/projects">
           <ThemedText type="link">プロジェクトを見る</ThemedText>
+        </Link>
+        <Link href="/(tabs)/dashboards">
+          <ThemedText type="link">ダッシュボードを見る</ThemedText>
         </Link>
         <Link href={{ pathname: "/modal", params: { mode: "issue" } }}>
           <ThemedText type="link">課題を作成</ThemedText>
@@ -194,6 +219,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#2563eb",
     borderRadius: 12,
+    minHeight: 44,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -217,6 +243,7 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
+    minHeight: 44,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },

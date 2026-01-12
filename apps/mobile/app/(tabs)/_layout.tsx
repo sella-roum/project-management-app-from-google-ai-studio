@@ -40,15 +40,6 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="dashboards"
-          options={{
-            title: "Dashboards",
-            tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="chart.bar.fill" color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
           name="search"
           options={{
             title: "Search",
@@ -58,33 +49,11 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="notifications"
-          options={{
-            title: "Alerts",
-            tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="bell.fill" color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
           name="profile"
           options={{
             title: "Profile",
             tabBarIcon: ({ color }) => (
               <IconSymbol size={28} name="person.fill" color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="help"
-          options={{
-            title: "Help",
-            tabBarIcon: ({ color }) => (
-              <IconSymbol
-                size={28}
-                name="questionmark.circle.fill"
-                color={color}
-              />
             ),
           }}
         />

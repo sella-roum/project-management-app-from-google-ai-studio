@@ -27,10 +27,16 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 export function IssueCard({ issue, onPress }: IssueCardProps) {
+  const dueDate = issue.dueDate ? new Date(issue.dueDate) : null;
+  const isOverdue =
+    dueDate && issue.status !== "Done" && dueDate.getTime() < Date.now();
+  const isHighPriority =
+    issue.priority === "Highest" || issue.priority === "High";
+
   return (
     <Pressable onPress={onPress} style={styles.card}>
       <ThemedView style={styles.rowBetween}>
-        <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
+        <ThemedText style={styles.issueKey}>{issue.key}</ThemedText>
         <ThemedView
           style={[
             styles.statusBadge,
@@ -42,7 +48,9 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
           </ThemedText>
         </ThemedView>
       </ThemedView>
-      <ThemedText numberOfLines={2}>{issue.title}</ThemedText>
+      <ThemedText numberOfLines={2} style={styles.issueTitle}>
+        {issue.title}
+      </ThemedText>
       <ThemedView style={styles.metaRow}>
         <ThemedText style={styles.metaBadge}>
           {TYPE_LABELS[issue.type]}
@@ -55,10 +63,25 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
             },
           ]}
         >
-          <ThemedText style={styles.metaBadgeText}>
+          <ThemedText
+            style={[
+              styles.metaBadgeText,
+              isHighPriority && styles.alertText,
+            ]}
+          >
             {PRIORITY_LABELS[issue.priority]}
           </ThemedText>
         </ThemedView>
+        {dueDate ? (
+          <ThemedText style={[styles.metaBadge, styles.dateBadge]}>
+            {dueDate.toLocaleDateString()}
+          </ThemedText>
+        ) : null}
+        {isOverdue ? (
+          <ThemedText style={[styles.metaBadge, styles.overdueBadge]}>
+            期限切れ
+          </ThemedText>
+        ) : null}
       </ThemedView>
     </Pressable>
   );
@@ -74,12 +97,31 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 12,
   },
+  dateBadge: {
+    borderColor: "#fed7aa",
+    color: "#c2410c",
+  },
+  issueKey: {
+    color: "#687076",
+    fontSize: 12,
+  },
+  issueTitle: {
+    color: "#11181C",
+    fontWeight: "700",
+  },
+  overdueBadge: {
+    borderColor: "#fecaca",
+    color: "#b91c1c",
+  },
   metaBadge: {
     borderColor: "#e5e7eb",
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 4,
+  },
+  alertText: {
+    color: "#b91c1c",
   },
   metaBadgeText: {
     fontSize: 11,

@@ -48,6 +48,8 @@ import {
   USERS,
 } from "@repo/storage";
 
+import { EmptyState } from "@/components/empty-state";
+import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { FloatingActionButton } from "@/components/floating-action-button";
@@ -62,6 +64,11 @@ const TABS = [
   "Automation",
   "Settings",
 ] as const;
+const PRIMARY_TABS: (typeof TABS)[number][] = [
+  "Summary",
+  "Board",
+  "Backlog",
+];
 
 const BOARD_STATUSES: IssueStatus[] = [
   "To Do",
@@ -84,6 +91,8 @@ export default function ProjectViewScreen() {
   const [versions, setVersions] = useState<Version[]>([]);
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Summary");
+  const [showTabMenu, setShowTabMenu] = useState(false);
+  const [boardStatusIndex, setBoardStatusIndex] = useState(0);
   const [boardSwimlane, setBoardSwimlane] = useState<
     "none" | "assignee"
   >("none");
@@ -92,7 +101,6 @@ export default function ProjectViewScreen() {
     null,
   );
   const [inlineCreateTitle, setInlineCreateTitle] = useState("");
-  const [activeMoveIssueId, setActiveMoveIssueId] = useState<string | null>(null);
   const [boardOrder, setBoardOrder] = useState<Record<IssueStatus, string[]>>(
     () => ({
       "To Do": [],
@@ -607,17 +615,6 @@ export default function ProjectViewScreen() {
     return next;
   };
 
-  const moveIssueInBoard = (
-    status: IssueStatus,
-    issueId: string,
-    direction: "up" | "down",
-  ) => {
-    setBoardOrder((prev) => ({
-      ...prev,
-      [status]: moveInOrder(prev[status] ?? [], issueId, direction),
-    }));
-  };
-
   const moveIssueInSprint = (
     sprintId: string,
     issueId: string,
@@ -733,13 +730,143 @@ export default function ProjectViewScreen() {
     [],
   );
   const notificationRecipients = ["Reporter", "Assignee", "Watcher"];
+  const activeBoardStatus = BOARD_STATUSES[boardStatusIndex];
+
+  const renderBoardColumn = (status: IssueStatus) => {
+    const columnIssues = filteredIssues.filter(
+      (issue) => issue.status === status,
+    );
+    const order = boardOrder[status] ?? [];
+    const orderIndex = new Map(order.map((id, index) => [id, index]));
+    const orderedIssues = [...columnIssues].sort((a, b) => {
+      const aIndex = orderIndex.get(a.id) ?? order.length;
+      const bIndex = orderIndex.get(b.id) ?? order.length;
+      return aIndex - bIndex;
+    });
+    const limit = project?.columnSettings?.[status]?.limit;
+    const isOverLimit = Boolean(limit && columnIssues.length > limit);
+
+    const renderIssue = (issue: Issue) => {
+      const assigneeName =
+        USERS.find((user) => user.id === issue.assigneeId)?.name || "未割り当て";
+      const allowed = workflowSettings[issue.status] ?? [];
+      return (
+        <ThemedView key={issue.id} style={styles.issueCard}>
+          <Pressable
+            onPress={() => handleOpenIssue(issue.id)}
+            onLongPress={() => {
+              if (allowed.length === 0) return;
+              Alert.alert(
+                "ステータスを変更",
+                "次のステータスを選択してください。",
+                [
+                  ...allowed.map((next) => ({
+                    text: STATUS_LABELS[next],
+                    onPress: () => handleMoveIssue(issue.id, next),
+                  })),
+                  { text: "キャンセル", style: "cancel" },
+                ],
+              );
+            }}
+            style={styles.issueRow}
+          >
+            <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
+            <ThemedText>{issue.title}</ThemedText>
+          </Pressable>
+          <ThemedView style={styles.rowBetween}>
+            <ThemedText style={styles.metaText}>{assigneeName}</ThemedText>
+          </ThemedView>
+        </ThemedView>
+      );
+    };
+
+    return (
+      <ThemedView key={status} style={styles.card}>
+        <ThemedView style={styles.rowBetween}>
+          <ThemedText type="defaultSemiBold">
+            {STATUS_LABELS[status]}
+          </ThemedText>
+          <ThemedText
+            style={[styles.metaText, isOverLimit && styles.overLimitText]}
+          >
+            {columnIssues.length}
+            {limit ? ` / ${limit}` : ""}
+          </ThemedText>
+        </ThemedView>
+
+        {boardSwimlane === "assignee" ? (
+          swimlanes.map((lane) => {
+            const laneIssues =
+              lane.id === "unassigned"
+                ? orderedIssues.filter((i) => !i.assigneeId)
+                : lane.id === "all"
+                  ? orderedIssues
+                  : orderedIssues.filter((i) => i.assigneeId === lane.id);
+            if (laneIssues.length === 0) return null;
+            return (
+              <ThemedView key={`${status}-${lane.id}`} style={styles.section}>
+                <ThemedText style={styles.metaText}>
+                  {lane.name} ({laneIssues.length})
+                </ThemedText>
+                {laneIssues.map(renderIssue)}
+              </ThemedView>
+            );
+          })
+        ) : orderedIssues.length === 0 ? (
+          <ThemedText style={styles.metaText}>課題はありません。</ThemedText>
+        ) : (
+          orderedIssues.map(renderIssue)
+        )}
+
+        {status === "To Do" ? (
+          inlineCreateStatus === status ? (
+            <ThemedView style={styles.inlineCreate}>
+              <TextInput
+                style={styles.input}
+                placeholder="課題タイトル"
+                value={inlineCreateTitle}
+                onChangeText={setInlineCreateTitle}
+              />
+              <ThemedView style={styles.row}>
+                <Pressable
+                  onPress={() => handleInlineCreate(status)}
+                  style={styles.primaryBtn}
+                >
+                  <ThemedText type="link">作成</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setInlineCreateStatus(null);
+                    setInlineCreateTitle("");
+                  }}
+                  style={styles.secondaryBtn}
+                >
+                  <ThemedText>キャンセル</ThemedText>
+                </Pressable>
+              </ThemedView>
+            </ThemedView>
+          ) : (
+            <Pressable
+              onPress={() => setInlineCreateStatus(status)}
+              style={styles.ghostBtn}
+            >
+              <ThemedText>課題を追加</ThemedText>
+            </Pressable>
+          )
+        ) : null}
+      </ThemedView>
+    );
+  };
 
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
         <ThemedText type="title">Project</ThemedText>
         {!ready ? (
-          <ThemedText>Loading project...</ThemedText>
+          <ThemedView style={styles.card}>
+            <Skeleton height={20} width={180} />
+            <Skeleton height={14} width={240} />
+          </ThemedView>
         ) : project ? (
           <>
             <ThemedText type="subtitle">{project.name}</ThemedText>
@@ -754,7 +881,7 @@ export default function ProjectViewScreen() {
             </Link>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <ThemedView style={styles.tabRow}>
-                {TABS.map((tab) => (
+                {PRIMARY_TABS.map((tab) => (
                   <Pressable
                     key={tab}
                     onPress={() => setActiveTab(tab)}
@@ -763,6 +890,12 @@ export default function ProjectViewScreen() {
                     <ThemedText>{tab}</ThemedText>
                   </Pressable>
                 ))}
+                <Pressable
+                  onPress={() => setShowTabMenu(true)}
+                  style={styles.tab}
+                >
+                  <ThemedText>More</ThemedText>
+                </Pressable>
               </ThemedView>
             </ScrollView>
 
@@ -865,173 +998,32 @@ export default function ProjectViewScreen() {
                   </Pressable>
                 </ThemedView>
               </ThemedView>
-              {BOARD_STATUSES.map((status) => {
-                const columnIssues = filteredIssues.filter(
-                  (issue) => issue.status === status,
-                );
-                const order = boardOrder[status] ?? [];
-                const orderIndex = new Map(
-                  order.map((id, index) => [id, index]),
-                );
-                const orderedIssues = [...columnIssues].sort((a, b) => {
-                  const aIndex = orderIndex.get(a.id) ?? order.length;
-                  const bIndex = orderIndex.get(b.id) ?? order.length;
-                  return aIndex - bIndex;
-                });
-                const limit = project?.columnSettings?.[status]?.limit;
-                const isOverLimit = Boolean(limit && columnIssues.length > limit);
-
-                const renderIssue = (issue: Issue) => {
-                  const assigneeName =
-                    USERS.find((user) => user.id === issue.assigneeId)?.name ||
-                    "未割り当て";
-                  const allowed = workflowSettings[issue.status] ?? [];
-                  return (
-                    <ThemedView key={issue.id} style={styles.issueCard}>
-                      <Pressable
-                        onPress={() => handleOpenIssue(issue.id)}
-                        style={styles.issueRow}
-                      >
-                        <ThemedText type="defaultSemiBold">
-                          {issue.key}
-                        </ThemedText>
-                        <ThemedText>{issue.title}</ThemedText>
-                      </Pressable>
-                      <ThemedView style={styles.rowBetween}>
-                        <ThemedText style={styles.metaText}>
-                          {assigneeName}
-                        </ThemedText>
-                        <ThemedView style={styles.row}>
-                          <Pressable
-                            onPress={() => moveIssueInBoard(status, issue.id, "up")}
-                            style={styles.ghostBtnSmall}
-                          >
-                            <ThemedText>↑</ThemedText>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => moveIssueInBoard(status, issue.id, "down")}
-                            style={styles.ghostBtnSmall}
-                          >
-                            <ThemedText>↓</ThemedText>
-                          </Pressable>
-                          <Pressable
-                            onPress={() =>
-                              setActiveMoveIssueId(
-                                activeMoveIssueId === issue.id
-                                  ? null
-                                  : issue.id,
-                              )
-                            }
-                            style={styles.ghostBtnSmall}
-                          >
-                            <ThemedText>移動</ThemedText>
-                          </Pressable>
-                        </ThemedView>
-                      </ThemedView>
-                      {activeMoveIssueId === issue.id && allowed.length > 0 ? (
-                        <ThemedView style={styles.rowWrap}>
-                          {allowed.map((next) => (
-                            <Pressable
-                              key={next}
-                              onPress={() => handleMoveIssue(issue.id, next)}
-                              style={styles.actionChip}
-                            >
-                              <ThemedText>{STATUS_LABELS[next]}</ThemedText>
-                            </Pressable>
-                          ))}
-                        </ThemedView>
-                      ) : null}
-                    </ThemedView>
-                  );
-                };
-
-                return (
-                  <ThemedView key={status} style={styles.card}>
-                    <ThemedView style={styles.rowBetween}>
-                      <ThemedText type="defaultSemiBold">
-                        {STATUS_LABELS[status]}
-                      </ThemedText>
-                      <ThemedText
-                        style={[
-                          styles.metaText,
-                          isOverLimit && styles.overLimitText,
-                        ]}
-                      >
-                        {columnIssues.length}
-                        {limit ? ` / ${limit}` : ""}
-                      </ThemedText>
-                    </ThemedView>
-
-                    {boardSwimlane === "assignee" ? (
-                      swimlanes.map((lane) => {
-                        const laneIssues =
-                          lane.id === "unassigned"
-                            ? orderedIssues.filter((i) => !i.assigneeId)
-                            : lane.id === "all"
-                              ? orderedIssues
-                              : orderedIssues.filter(
-                                  (i) => i.assigneeId === lane.id,
-                                );
-                        if (laneIssues.length === 0) return null;
-                        return (
-                          <ThemedView
-                            key={`${status}-${lane.id}`}
-                            style={styles.section}
-                          >
-                            <ThemedText style={styles.metaText}>
-                              {lane.name} ({laneIssues.length})
-                            </ThemedText>
-                            {laneIssues.map(renderIssue)}
-                          </ThemedView>
-                        );
-                      })
-                    ) : orderedIssues.length === 0 ? (
-                      <ThemedText style={styles.metaText}>
-                        課題はありません。
-                      </ThemedText>
-                    ) : (
-                      orderedIssues.map(renderIssue)
-                    )}
-
-                    {status === "To Do" ? (
-                      inlineCreateStatus === status ? (
-                        <ThemedView style={styles.inlineCreate}>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="課題タイトル"
-                            value={inlineCreateTitle}
-                            onChangeText={setInlineCreateTitle}
-                          />
-                          <ThemedView style={styles.row}>
-                            <Pressable
-                              onPress={() => handleInlineCreate(status)}
-                              style={styles.primaryBtn}
-                            >
-                              <ThemedText type="link">作成</ThemedText>
-                            </Pressable>
-                            <Pressable
-                              onPress={() => {
-                                setInlineCreateStatus(null);
-                                setInlineCreateTitle("");
-                              }}
-                              style={styles.secondaryBtn}
-                            >
-                              <ThemedText>キャンセル</ThemedText>
-                            </Pressable>
-                          </ThemedView>
-                        </ThemedView>
-                      ) : (
-                        <Pressable
-                          onPress={() => setInlineCreateStatus(status)}
-                          style={styles.ghostBtn}
-                        >
-                          <ThemedText>課題を追加</ThemedText>
-                        </Pressable>
-                      )
-                    ) : null}
-                  </ThemedView>
-                );
-              })}
+              <ThemedView style={styles.rowBetween}>
+                <Pressable
+                  onPress={() =>
+                    setBoardStatusIndex((prev) => Math.max(0, prev - 1))
+                  }
+                  style={styles.secondaryBtn}
+                  disabled={boardStatusIndex === 0}
+                >
+                  <ThemedText>前へ</ThemedText>
+                </Pressable>
+                <ThemedText type="defaultSemiBold">
+                  {STATUS_LABELS[activeBoardStatus]}
+                </ThemedText>
+                <Pressable
+                  onPress={() =>
+                    setBoardStatusIndex((prev) =>
+                      Math.min(BOARD_STATUSES.length - 1, prev + 1),
+                    )
+                  }
+                  style={styles.secondaryBtn}
+                  disabled={boardStatusIndex === BOARD_STATUSES.length - 1}
+                >
+                  <ThemedText>次へ</ThemedText>
+                </Pressable>
+              </ThemedView>
+              {renderBoardColumn(activeBoardStatus)}
             </ThemedView>
           ) : null}
 
@@ -1696,7 +1688,10 @@ export default function ProjectViewScreen() {
           ) : null}
           </>
         ) : (
-          <ThemedText>Project not found.</ThemedText>
+          <EmptyState
+            title="Project not found."
+            description="このプロジェクトは見つかりませんでした。"
+          />
         )}
 
       {completeSprint ? (
@@ -1911,6 +1906,31 @@ export default function ProjectViewScreen() {
                 <ThemedText type="link">保存</ThemedText>
               </Pressable>
             </ThemedView>
+          </ThemedView>
+        </ThemedView>
+      ) : null}
+      {showTabMenu ? (
+        <ThemedView style={styles.overlay}>
+          <ThemedView style={styles.modalCard}>
+            <ThemedText type="subtitle">その他のタブ</ThemedText>
+            {TABS.filter((tab) => !PRIMARY_TABS.includes(tab)).map((tab) => (
+              <Pressable
+                key={tab}
+                onPress={() => {
+                  setActiveTab(tab);
+                  setShowTabMenu(false);
+                }}
+                style={styles.option}
+              >
+                <ThemedText>{tab}</ThemedText>
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => setShowTabMenu(false)}
+              style={styles.secondaryBtn}
+            >
+              <ThemedText>閉じる</ThemedText>
+            </Pressable>
           </ThemedView>
         </ThemedView>
       ) : null}
