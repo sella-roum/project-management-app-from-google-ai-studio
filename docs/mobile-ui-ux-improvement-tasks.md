@@ -17,13 +17,13 @@
 **目的:** 迷いを削減し、主要導線を 4 タブに集約。
 
 ### タスク
-- [ ] `apps/mobile/app/(tabs)/_layout.tsx`
+- [x] `apps/mobile/app/(tabs)/_layout.tsx`
   - [x] Bottom Tabs を **Home / Projects / Search / Profile** に絞る。
   - [x] Notifications / Help / Settings は Profile 配下へ移動。
   - [x] Dashboards は Home もしくは Projects サマリーに統合。
-- [ ] 影響画面の導線確認
-  - [ ] 既存のタブ遷移・深いリンク（deep link）を整理。
-  - [ ] Web の導線と同等の機能アクセスが可能かを検証。
+- [x] 影響画面の導線確認
+  - [x] 既存のタブ遷移・深いリンク（deep link）を整理。
+  - [x] Web の導線と同等の機能アクセスが可能かを検証。
 
 ---
 
@@ -35,7 +35,7 @@
 - [x] `apps/mobile/app/project/[projectId]/index.tsx` を分割・整理
   - [x] `_layout.tsx` を新規作成し、Top Tabs ナビゲーションを設定。
   - [x] `summary.tsx` / `board.tsx` / `backlog.tsx` / `timeline.tsx` / `settings.tsx` を分割作成。
-- [ ] Top Tabs 表示ルール
+- [x] Top Tabs 表示ルール
   - [x] 重要度上位 3 画面を固定表示、残りは「もっと見る」導線へ。
 - [x] Project データの取得と共有
   - [x] 既存の取得ロジックを `ProjectProvider` などで共通化。

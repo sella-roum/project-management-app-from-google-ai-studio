@@ -8,11 +8,12 @@
 - EmptyState / Skeleton を追加し、Home / Project / Search / Issue に反映。
 - Search の上部に「最近 / 保存済み / おすすめ」を追加し、フィルタチップで適用条件を可視化。
 - アクセシビリティ改善（主要ボタンの 44px タップ領域、VoiceOver ラベル、ハプティクス）。
+- 品質ゲートの実行（lint/typecheck）を実施し、typecheck は既存の型エラーにより失敗。
 
 ## チェックリスト進捗
 - 追加・修正した内容は `docs/mobile-ui-ux-improvement-tasks.md` に反映。
 
 ## 完成度評価
-- 完成度: **高（8/10）**
+- 完成度: **中（7/10）**
 
-残タスク（Parity/品質ゲートの完全実施）を含め、引き続き進行が必要です。
+残タスク（typecheck のエラー解消、テスト、起動確認）が残っています。
