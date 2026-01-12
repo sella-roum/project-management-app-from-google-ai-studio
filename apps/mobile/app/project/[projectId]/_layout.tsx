@@ -82,7 +82,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   moreMenu: {
-    backgroundColor: "#ffffff",
     borderBottomColor: "#e5e7eb",
     borderBottomWidth: 1,
     gap: 8,

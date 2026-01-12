@@ -23,7 +23,7 @@ export function EmptyState({
       {description ? <ThemedText style={styles.text}>{description}</ThemedText> : null}
       {actionLabel && onAction ? (
         <Pressable onPress={onAction} style={styles.button}>
-          <ThemedText type="link">{actionLabel}</ThemedText>
+          <ThemedText style={styles.buttonText}>{actionLabel}</ThemedText>
         </Pressable>
       ) : null}
     </ThemedView>
@@ -38,6 +38,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  buttonText: {
+    color: "#ffffff",
   },
   container: {
     alignItems: "center",
