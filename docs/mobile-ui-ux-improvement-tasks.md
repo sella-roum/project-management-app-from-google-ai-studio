@@ -32,13 +32,13 @@
 **目的:** Project 内の画面構成を整理し、Web に追従しつつモバイル最適化。
 
 ### タスク
-- [ ] `apps/mobile/app/project/[projectId]/index.tsx` を分割・整理
-  - [ ] `_layout.tsx` を新規作成し、Top Tabs ナビゲーションを設定。
-  - [ ] `summary.tsx` / `board.tsx` / `backlog.tsx` / `timeline.tsx` / `settings.tsx` を分割作成。
+- [x] `apps/mobile/app/project/[projectId]/index.tsx` を分割・整理
+  - [x] `_layout.tsx` を新規作成し、Top Tabs ナビゲーションを設定。
+  - [x] `summary.tsx` / `board.tsx` / `backlog.tsx` / `timeline.tsx` / `settings.tsx` を分割作成。
 - [ ] Top Tabs 表示ルール
   - [x] 重要度上位 3 画面を固定表示、残りは「もっと見る」導線へ。
-- [ ] Project データの取得と共有
-  - [ ] 既存の取得ロジックを `ProjectProvider` などで共通化。
+- [x] Project データの取得と共有
+  - [x] 既存の取得ロジックを `ProjectProvider` などで共通化。
 
 ---
 
@@ -47,10 +47,10 @@
 **目的:** モバイルに最適化したカンバン体験を提供。
 
 ### タスク
-- [ ] `apps/mobile/app/project/[projectId]/index.tsx`（Boardタブ）
+- [x] `apps/mobile/app/project/[projectId]/board.tsx`（Boardタブ）
   - [x] 1画面1カラム表示（PagerView もしくは左右スワイプ）に変更。
   - [x] ステータス切り替え UI を上部タブまたはスワイプで統一。
-- [ ] ステータス移動の操作改善
+- [x] ステータス移動の操作改善
   - [x] カード内の小さなボタンを廃止。
   - [x] 長押しメニュー or アクションシートで「次のステータスへ移動」を提供。
 
@@ -61,13 +61,13 @@
 **目的:** Web で可能な編集操作を Mobile でも完全に実現。
 
 ### タスク
-- [ ] `apps/mobile/app/issue/[issueId].tsx`
+- [x] `apps/mobile/app/issue/[issueId].tsx`
   - [x] Description / Story Points / Due Date を編集可能にする。
   - [x] 各フィールドは Auto Save（onBlur / 完了ボタン）に統一。
-- [ ] Bottom Sheet（SelectionSheet）導入
+- [x] Bottom Sheet（SelectionSheet）導入
   - [x] `components/SelectionSheet.tsx` を新規作成。
   - [x] Status / Priority / Assignee の編集は Bottom Sheet に統一。
-- [ ] 固定アクションバー設置
+- [x] 固定アクションバー設置
   - [x] 画面下部に Comment / Status / More の固定アクションを配置。
 
 ---
@@ -77,11 +77,11 @@
 **目的:** 一覧表示の統一感と可読性を高める。
 
 ### タスク
-- [ ] `components/issue-card.tsx`
+- [x] `components/issue-card.tsx`
   - [x] タイトル：太字・濃い黒 (#11181C)。
   - [x] キー：小さめ・薄いグレー (#687076)。
   - [x] 期限切れや高優先度の視覚的強調（アイコンの色変更など）。
-- [ ] 一覧表示の統一
+- [x] 一覧表示の統一
   - [x] 「カード＋2行要約＋主要メタ（優先度/担当/期日）」を標準レイアウトにする。
 
 ---
@@ -91,11 +91,11 @@
 **目的:** 状態表示の統一とユーザー迷いの防止。
 
 ### タスク
-- [ ] `components/EmptyState.tsx` を新規作成
+- [x] `components/EmptyState.tsx` を新規作成
   - [x] アイコン＋メッセージ＋「課題作成」アクションボタン付き。
-- [ ] `components/Skeleton.tsx` を新規作成
+- [x] `components/Skeleton.tsx` を新規作成
   - [x] ローディング中のスケルトン表示（アニメーション含む）。
-- [ ] 各主要画面（Home / Project / Search / Issue）へ適用。
+- [x] 各主要画面（Home / Project / Search / Issue）へ適用。
   - [x] 各主要画面（Home / Project / Search / Issue）へ適用。
 
 ---
@@ -105,9 +105,9 @@
 **目的:** モバイルでの探索体験を改善し、Web の機能と同等化。
 
 ### タスク
-- [ ] `apps/mobile/app/search.tsx`
+- [x] `apps/mobile/app/search.tsx`
   - [x] 最近・保存済み・おすすめ（未完了/自分担当/期限切れ）を上部固定表示。
-- [ ] 検索フィルタ UX
+- [x] 検索フィルタ UX
   - [x] フィルタはチップ表示・適用中条件が常時見える。
   - [x] ワンタップ解除を提供。
 
@@ -129,10 +129,10 @@
 **目的:** Web と Mobile の完全な機能一致を担保。
 
 ### タスク
-- [ ] `docs/feature_parity.md` の更新
-  - [ ] 実装後に差分が残る場合は理由を記載。
+- [x] `docs/feature_parity.md` の更新
+  - [x] 実装後に差分が残る場合は理由を記載。
 - [ ] 品質ゲートの実行
-  - [ ] `npm --workspace apps/mobile run lint`
+  - [x] `npm --workspace apps/mobile run lint`
   - [ ] `npm --workspace apps/mobile run typecheck`（存在する場合）
   - [ ] 該当テスト（存在する場合）
 - [ ] 起動確認

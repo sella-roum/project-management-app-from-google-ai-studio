@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Alert,
@@ -19,28 +19,21 @@ import type {
   AutomationRule,
   Issue,
   IssueStatus,
-  ProjectStats,
   Project,
   Sprint,
-  Version,
 } from "@repo/core";
 import {
   createAutomationRule,
   createIssue,
   createVersion,
   deleteProject,
-  getAutomationRules,
   getAutomationLogs,
+  getAutomationRules,
   getCurrentUserId,
-  getIssues,
-  getProjectById,
-  getProjectStats,
-  getSprints,
-  getVersions,
   recordView,
-  updateIssue,
   toggleAutomationRule,
   updateAutomationRule,
+  updateIssue,
   updateIssueStatus,
   updateProject,
   updateSprintStatus,
@@ -53,7 +46,7 @@ import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { FloatingActionButton } from "@/components/floating-action-button";
-import { useStorageReady } from "@/hooks/use-storage";
+import { useProjectData } from "@/app/project/[projectId]/project-context";
 
 const TABS = [
   "Summary",
@@ -64,12 +57,6 @@ const TABS = [
   "Automation",
   "Settings",
 ] as const;
-const PRIMARY_TABS: (typeof TABS)[number][] = [
-  "Summary",
-  "Board",
-  "Backlog",
-];
-
 const BOARD_STATUSES: IssueStatus[] = [
   "To Do",
   "In Progress",
@@ -77,21 +64,17 @@ const BOARD_STATUSES: IssueStatus[] = [
   "Done",
 ];
 
-export default function ProjectViewScreen() {
-  const ready = useStorageReady();
+type ProjectViewProps = {
+  initialTab: (typeof TABS)[number];
+  showTabs?: boolean;
+};
+
+export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) {
   const router = useRouter();
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
-  const normalizedProjectId = useMemo(
-    () => (Array.isArray(projectId) ? projectId[0] : projectId),
-    [projectId],
-  );
-  const [project, setProject] = useState<Project | null>(null);
-  const [issues, setIssues] = useState<Issue[]>([]);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [versions, setVersions] = useState<Version[]>([]);
-  const [stats, setStats] = useState<ProjectStats | null>(null);
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Summary");
-  const [showTabMenu, setShowTabMenu] = useState(false);
+  const { ready, projectId, project, issues, sprints, versions, stats, reload } =
+    useProjectData();
+  const normalizedProjectId = projectId;
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>(initialTab);
   const [boardStatusIndex, setBoardStatusIndex] = useState(0);
   const [boardSwimlane, setBoardSwimlane] = useState<
     "none" | "assignee"
@@ -175,31 +158,19 @@ export default function ProjectViewScreen() {
     set_priority_high: "優先度を「高」にする",
   };
 
-  const reload = useCallback(async () => {
-    if (!normalizedProjectId) return;
-    const [projectData, issueData, sprintData, versionData, ruleData, statsData] =
-      await Promise.all([
-        getProjectById(normalizedProjectId),
-        getIssues(normalizedProjectId),
-        getSprints(normalizedProjectId),
-        getVersions(normalizedProjectId),
-        getAutomationRules(normalizedProjectId),
-        getProjectStats(normalizedProjectId),
-      ]);
-    setProject(projectData);
-    setIssues(issueData);
-    setSprints(sprintData);
-    setVersions(versionData);
-    setAutomationRules(ruleData.map((rule) => rule));
-    setStats(statsData);
-    setProjectName(projectData?.name ?? "");
-    setProjectKey(projectData?.key ?? "");
-    setProjectDescription(projectData?.description ?? "");
-    setProjectCategory(projectData?.category ?? "");
-    const workflow = (projectData?.workflowSettings ??
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    const workflow = (project?.workflowSettings ??
       WORKFLOW_TRANSITIONS) as Record<IssueStatus, IssueStatus[]>;
     const notifications =
-      projectData?.notificationSettings ?? DEFAULT_NOTIFICATION_SCHEME;
+      project?.notificationSettings ?? DEFAULT_NOTIFICATION_SCHEME;
+    setProjectName(project?.name ?? "");
+    setProjectKey(project?.key ?? "");
+    setProjectDescription(project?.description ?? "");
+    setProjectCategory(project?.category ?? "");
     setWorkflowSettings(
       Object.fromEntries(
         Object.entries(workflow).map(([status, next]) => [
@@ -232,7 +203,16 @@ export default function ProjectViewScreen() {
         ]),
       ),
     );
-  }, [normalizedProjectId]);
+  }, [project, initialTab]);
+
+  useEffect(() => {
+    if (!ready || !projectId) return;
+    const loadRules = async () => {
+      const ruleData = await getAutomationRules(projectId);
+      setAutomationRules(ruleData.map((rule) => rule));
+    };
+    void loadRules();
+  }, [ready, projectId]);
 
   useEffect(() => {
     return () => {
@@ -241,11 +221,6 @@ export default function ProjectViewScreen() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!ready || !normalizedProjectId) return;
-    void reload();
-  }, [ready, normalizedProjectId, reload]);
 
   useEffect(() => {
     if (!selectedRuleId) {
@@ -879,25 +854,21 @@ export default function ProjectViewScreen() {
             >
               <ThemedText type="link">Create issue</ThemedText>
             </Link>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <ThemedView style={styles.tabRow}>
-                {PRIMARY_TABS.map((tab) => (
-                  <Pressable
-                    key={tab}
-                    onPress={() => setActiveTab(tab)}
-                    style={[styles.tab, activeTab === tab && styles.tabActive]}
-                  >
-                    <ThemedText>{tab}</ThemedText>
-                  </Pressable>
-                ))}
-                <Pressable
-                  onPress={() => setShowTabMenu(true)}
-                  style={styles.tab}
-                >
-                  <ThemedText>More</ThemedText>
-                </Pressable>
-              </ThemedView>
-            </ScrollView>
+            {showTabs ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <ThemedView style={styles.tabRow}>
+                  {TABS.map((tab) => (
+                    <Pressable
+                      key={tab}
+                      onPress={() => setActiveTab(tab)}
+                      style={[styles.tab, activeTab === tab && styles.tabActive]}
+                    >
+                      <ThemedText>{tab}</ThemedText>
+                    </Pressable>
+                  ))}
+                </ThemedView>
+              </ScrollView>
+            ) : null}
 
           {activeTab === "Summary" ? (
             <ThemedView style={styles.section}>
@@ -1909,31 +1880,6 @@ export default function ProjectViewScreen() {
           </ThemedView>
         </ThemedView>
       ) : null}
-      {showTabMenu ? (
-        <ThemedView style={styles.overlay}>
-          <ThemedView style={styles.modalCard}>
-            <ThemedText type="subtitle">その他のタブ</ThemedText>
-            {TABS.filter((tab) => !PRIMARY_TABS.includes(tab)).map((tab) => (
-              <Pressable
-                key={tab}
-                onPress={() => {
-                  setActiveTab(tab);
-                  setShowTabMenu(false);
-                }}
-                style={styles.option}
-              >
-                <ThemedText>{tab}</ThemedText>
-              </Pressable>
-            ))}
-            <Pressable
-              onPress={() => setShowTabMenu(false)}
-              style={styles.secondaryBtn}
-            >
-              <ThemedText>閉じる</ThemedText>
-            </Pressable>
-          </ThemedView>
-        </ThemedView>
-      ) : null}
       </ScrollView>
       {normalizedProjectId ? (
         <FloatingActionButton
@@ -1949,6 +1895,18 @@ export default function ProjectViewScreen() {
       ) : null}
     </ThemedView>
   );
+}
+
+export default function ProjectIndexRedirect() {
+  const router = useRouter();
+  const { projectId } = useLocalSearchParams<{ projectId: string }>();
+  useEffect(() => {
+    if (!projectId) return;
+    const normalized = Array.isArray(projectId) ? projectId[0] : projectId;
+    router.replace(`/project/${normalized}/summary`);
+  }, [projectId, router]);
+
+  return null;
 }
 
 const styles = StyleSheet.create({
