@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput , Share } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  Share,
+} from "react-native";
 import * as Linking from "expo-linking";
 import * as DocumentPicker from "expo-document-picker";
+import * as Haptics from "expo-haptics";
 
 import type {
   Issue,
@@ -37,6 +45,9 @@ import {
   updateIssueStatus,
 } from "@repo/storage";
 
+import { EmptyState } from "@/components/empty-state";
+import { SelectionSheet } from "@/components/selection-sheet";
+import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useStorageReady } from "@/hooks/use-storage";
@@ -67,6 +78,12 @@ export default function IssueDetailScreen() {
   >("relates to");
   const [attachmentName, setAttachmentName] = useState("");
   const [attachmentUri, setAttachmentUri] = useState("");
+  const [storyPoints, setStoryPoints] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [activeSheet, setActiveSheet] = useState<
+    "status" | "priority" | "assignee" | null
+  >(null);
+  const commentInputRef = useRef<TextInput | null>(null);
 
   const currentUserId = getCurrentUserId();
 
@@ -77,6 +94,10 @@ export default function IssueDetailScreen() {
     if (issueData) {
       setTitle(issueData.title);
       setDescription(issueData.description ?? "");
+      setStoryPoints(
+        issueData.storyPoints !== undefined ? String(issueData.storyPoints) : "",
+      );
+      setDueDate(issueData.dueDate ? issueData.dueDate.slice(0, 10) : "");
       const [projectData, versionData, subtaskData] = await Promise.all([
         getProjectById(issueData.projectId),
         getVersions(issueData.projectId),
@@ -138,13 +159,49 @@ export default function IssueDetailScreen() {
     await reload();
   };
 
+  const handleSaveStoryPoints = async () => {
+    if (!issue) return;
+    const trimmed = storyPoints.trim();
+    if (!trimmed) {
+      await updateIssue(issue.id, { storyPoints: undefined });
+      await reload();
+      return;
+    }
+    const numeric = Number(trimmed);
+    if (!Number.isFinite(numeric)) {
+      Alert.alert("入力エラー", "ポイントは数値で入力してください。");
+      return;
+    }
+    await updateIssue(issue.id, { storyPoints: numeric });
+    await reload();
+  };
+
+  const handleSaveDueDate = async () => {
+    if (!issue) return;
+    const trimmed = dueDate.trim();
+    if (!trimmed) {
+      await updateIssue(issue.id, { dueDate: undefined });
+      await reload();
+      return;
+    }
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) {
+      Alert.alert("入力エラー", "YYYY-MM-DD 形式で入力してください。");
+      return;
+    }
+    await updateIssue(issue.id, { dueDate: date.toISOString() });
+    await reload();
+  };
+
   const handleStatusChange = async (status: IssueStatus) => {
     if (!issue) return;
     const result = await updateIssueStatus(issue.id, status);
     if (!result) {
       Alert.alert("ステータス変更不可", "この遷移は許可されていません。");
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await reload();
   };
 
@@ -153,8 +210,10 @@ export default function IssueDetailScreen() {
     const updated = await updateIssue(issue.id, patch);
     if (updated === false) {
       Alert.alert("更新不可", "入力内容を確認してください。");
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await reload();
   };
 
@@ -162,6 +221,7 @@ export default function IssueDetailScreen() {
     if (!issue || !commentText.trim()) return;
     await addComment(issue.id, commentText.trim());
     setCommentText("");
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await reload();
   };
 
@@ -265,15 +325,39 @@ export default function IssueDetailScreen() {
     await reload();
   };
 
+  const statusOptions = (Object.keys(STATUS_LABELS) as IssueStatus[]).map(
+    (status) => ({
+      value: status,
+      label: STATUS_LABELS[status],
+    }),
+  );
+  const priorityOptions = (Object.keys(PRIORITY_LABELS) as IssuePriority[]).map(
+    (priority) => ({
+      value: priority,
+      label: PRIORITY_LABELS[priority],
+    }),
+  );
+  const assigneeOptions = [
+    { value: "unassigned", label: "未割り当て" },
+    ...USERS.map((user) => ({ value: user.id, label: user.name })),
+  ];
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <ThemedText type="title">Issue</ThemedText>
-      {!ready ? (
-        <ThemedText>Loading issue...</ThemedText>
-      ) : !issue ? (
-        <ThemedText>Issue not found.</ThemedText>
-      ) : (
-        <>
+    <ThemedView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <ThemedText type="title">Issue</ThemedText>
+        {!ready ? (
+          <ThemedView style={styles.card}>
+            <Skeleton height={20} width={160} />
+            <Skeleton height={14} width={240} />
+          </ThemedView>
+        ) : !issue ? (
+          <EmptyState
+            title="Issue not found."
+            description="この課題は見つかりませんでした。"
+          />
+        ) : (
+          <>
           <ThemedView style={styles.card}>
             <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
             <TextInput
@@ -284,37 +368,19 @@ export default function IssueDetailScreen() {
               placeholder="タイトル"
             />
             <ThemedText type="subtitle">ステータス</ThemedText>
-            <ThemedView style={styles.rowWrap}>
-              {(Object.keys(STATUS_LABELS) as IssueStatus[]).map((status) => (
-                <Pressable
-                  key={status}
-                  onPress={() => handleStatusChange(status)}
-                  style={[
-                    styles.option,
-                    issue.status === status && styles.optionActive,
-                  ]}
-                >
-                  <ThemedText>{STATUS_LABELS[status]}</ThemedText>
-                </Pressable>
-              ))}
-            </ThemedView>
+            <Pressable
+              onPress={() => setActiveSheet("status")}
+              style={styles.selector}
+            >
+              <ThemedText>{STATUS_LABELS[issue.status]}</ThemedText>
+            </Pressable>
             <ThemedText type="subtitle">優先度</ThemedText>
-            <ThemedView style={styles.rowWrap}>
-              {(Object.keys(PRIORITY_LABELS) as IssuePriority[]).map(
-                (priority) => (
-                  <Pressable
-                    key={priority}
-                    onPress={() => handleFieldUpdate({ priority })}
-                    style={[
-                      styles.option,
-                      issue.priority === priority && styles.optionActive,
-                    ]}
-                  >
-                    <ThemedText>{PRIORITY_LABELS[priority]}</ThemedText>
-                  </Pressable>
-                ),
-              )}
-            </ThemedView>
+            <Pressable
+              onPress={() => setActiveSheet("priority")}
+              style={styles.selector}
+            >
+              <ThemedText>{PRIORITY_LABELS[issue.priority]}</ThemedText>
+            </Pressable>
             <ThemedText type="subtitle">タイプ</ThemedText>
             <ThemedView style={styles.rowWrap}>
               {(Object.keys(TYPE_LABELS) as IssueType[]).map((type) => (
@@ -331,29 +397,17 @@ export default function IssueDetailScreen() {
               ))}
             </ThemedView>
             <ThemedText type="subtitle">担当者</ThemedText>
-            <ThemedView style={styles.rowWrap}>
-              <Pressable
-                onPress={() => handleFieldUpdate({ assigneeId: undefined })}
-                style={[
-                  styles.option,
-                  !issue.assigneeId && styles.optionActive,
-                ]}
-              >
-                <ThemedText>未割り当て</ThemedText>
-              </Pressable>
-              {USERS.map((user) => (
-                <Pressable
-                  key={user.id}
-                  onPress={() => handleFieldUpdate({ assigneeId: user.id })}
-                  style={[
-                    styles.option,
-                    issue.assigneeId === user.id && styles.optionActive,
-                  ]}
-                >
-                  <ThemedText>{user.name}</ThemedText>
-                </Pressable>
-              ))}
-            </ThemedView>
+            <Pressable
+              onPress={() => setActiveSheet("assignee")}
+              style={styles.selector}
+            >
+              <ThemedText>
+                {issue.assigneeId
+                  ? USERS.find((user) => user.id === issue.assigneeId)?.name ??
+                    "未割り当て"
+                  : "未割り当て"}
+              </ThemedText>
+            </Pressable>
           </ThemedView>
 
           <ThemedView style={styles.card}>
@@ -365,6 +419,26 @@ export default function IssueDetailScreen() {
               onBlur={handleSaveDescription}
               multiline
               placeholder="詳細を入力..."
+            />
+          </ThemedView>
+
+          <ThemedView style={styles.card}>
+            <ThemedText type="subtitle">ストーリーポイント</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="例: 3"
+              value={storyPoints}
+              onChangeText={setStoryPoints}
+              onBlur={handleSaveStoryPoints}
+              keyboardType="numeric"
+            />
+            <ThemedText type="subtitle">期限</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD"
+              value={dueDate}
+              onChangeText={setDueDate}
+              onBlur={handleSaveDueDate}
             />
           </ThemedView>
 
@@ -423,6 +497,7 @@ export default function IssueDetailScreen() {
           <ThemedView style={styles.card}>
             <ThemedText type="subtitle">コメント</ThemedText>
             <TextInput
+              ref={commentInputRef}
               style={[styles.input, styles.textArea]}
               value={commentText}
               onChangeText={setCommentText}
@@ -629,10 +704,96 @@ export default function IssueDetailScreen() {
         </>
       )}
     </ScrollView>
+    {issue ? (
+      <ThemedView style={styles.actionBar}>
+        <Pressable
+          onPress={() => commentInputRef.current?.focus()}
+          style={styles.actionButton}
+          accessibilityLabel="コメントを追加"
+        >
+          <ThemedText type="link">コメント</ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => setActiveSheet("status")}
+          style={styles.actionButton}
+          accessibilityLabel="ステータスを変更"
+        >
+          <ThemedText type="link">ステータス</ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() =>
+            Alert.alert("その他", "操作を選択してください。", [
+              { text: "共有", onPress: handleShare },
+              {
+                text: isWatching ? "ウォッチ解除" : "ウォッチ",
+                onPress: handleToggleWatch,
+              },
+              { text: "削除", style: "destructive", onPress: handleDelete },
+              { text: "キャンセル", style: "cancel" },
+            ])
+          }
+          style={styles.actionButton}
+          accessibilityLabel="その他の操作"
+        >
+          <ThemedText type="link">その他</ThemedText>
+        </Pressable>
+      </ThemedView>
+    ) : null}
+    <SelectionSheet
+      visible={activeSheet === "status"}
+      title="ステータスを選択"
+      options={statusOptions}
+      onSelect={(value) => {
+        void handleStatusChange(value as IssueStatus);
+        setActiveSheet(null);
+      }}
+      onClose={() => setActiveSheet(null)}
+    />
+    <SelectionSheet
+      visible={activeSheet === "priority"}
+      title="優先度を選択"
+      options={priorityOptions}
+      onSelect={(value) => {
+        void handleFieldUpdate({ priority: value as IssuePriority });
+        setActiveSheet(null);
+      }}
+      onClose={() => setActiveSheet(null)}
+    />
+    <SelectionSheet
+      visible={activeSheet === "assignee"}
+      title="担当者を選択"
+      options={assigneeOptions}
+      onSelect={(value) => {
+        void handleFieldUpdate({
+          assigneeId: value === "unassigned" ? undefined : value,
+        });
+        setActiveSheet(null);
+      }}
+      onClose={() => setActiveSheet(null)}
+    />
+  </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  actionBar: {
+    backgroundColor: "#ffffff",
+    borderTopColor: "#e5e7eb",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  actionButton: {
+    alignItems: "center",
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    flex: 1,
+    minHeight: 44,
+    paddingVertical: 10,
+  },
   card: {
     borderRadius: 16,
     gap: 6,
@@ -641,6 +802,7 @@ const styles = StyleSheet.create({
   container: {
     gap: 16,
     padding: 24,
+    paddingBottom: 120,
   },
   dangerButton: {
     alignItems: "center",
@@ -678,6 +840,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563eb",
     borderRadius: 12,
     paddingVertical: 12,
+  },
+  screen: {
+    flex: 1,
+  },
+  selector: {
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   rowCard: {
     borderRadius: 12,

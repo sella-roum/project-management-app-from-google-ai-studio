@@ -296,6 +296,12 @@ export default function ProfileScreen() {
             />
           </ThemedView>
         </Pressable>
+        <Pressable
+          onPress={() => router.push("/(tabs)/notifications")}
+          style={styles.menuItem}
+        >
+          <ThemedText>通知一覧</ThemedText>
+        </Pressable>
         <Pressable onPress={handleLanguage} style={styles.menuItem}>
           <ThemedText>言語</ThemedText>
           <ThemedText style={styles.menuMeta}>日本語</ThemedText>

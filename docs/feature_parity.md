@@ -9,12 +9,12 @@
 | `SetupWizard` modal | `/setup` | Initial project creation flow |
 | `/` (Home) | `/(tabs)/home` | Overview + quick actions |
 | `/projects` | `/(tabs)/projects` | List + create + star toggle |
-| `/projects/:projectId` | `/project/[projectId]` | Summary/Board/Backlog/Timeline/Releases/Automation/Settings tabs |
+| `/projects/:projectId` | `/project/[projectId]/summary` | Summary/Board/Backlog/Timeline/Releases/Automation/Settings tabs |
 | `/search` | `/(tabs)/search` | JQL + saved filters |
-| `/notifications` | `/(tabs)/notifications` | Notifications list + mark all read |
+| `/notifications` | `/(tabs)/notifications` | Notifications list + mark all read (Profileから遷移) |
 | `/profile` | `/(tabs)/profile` | Profile edit + stats + reset |
-| `/help` | `/(tabs)/help` | Help Center entry |
-| `/dashboards` | `/(tabs)/dashboards` | Dashboards entry |
+| `/help` | `/(tabs)/help` | Help Center entry (Profileから遷移) |
+| `/dashboards` | `/(tabs)/dashboards` | Dashboards entry (Homeから遷移) |
 | `CreateIssueModal` | `/modal?mode=issue` | Create issue modal |
 | `IssueDrawer` | `/issue/[issueId]` | Mobile uses full-screen issue detail |
 
@@ -43,7 +43,7 @@
 ## Mobile layout comparison (from `apps/mobile/app/_layout.tsx` + `apps/mobile/app/(tabs)/_layout.tsx`)
 
 - Root stack: `(auth)` group, `(tabs)` group, `/project/[projectId]`, `/projects/[projectId]`, `/setup`, `/modal`.
-- Tabs: home, projects, dashboards, search, notifications, profile, help.
+- Tabs: home, projects, search, profile.
 
 ## Mobile parity gaps / 未到達な導線
 

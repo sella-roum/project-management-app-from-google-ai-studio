@@ -20,6 +20,8 @@ import {
   deleteSavedFilter,
 } from "@repo/storage";
 
+import { EmptyState } from "@/components/empty-state";
+import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IssueCard } from "@/components/issue-card";
@@ -90,6 +92,33 @@ export default function SearchScreen() {
     return results;
   }, [issues, isJqlMode, query, activeFilter, filterProjectId]);
 
+  const recentIssues = useMemo(
+    () =>
+      [...issues]
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, 5),
+    [issues],
+  );
+
+  const recommendedIssues = useMemo(() => {
+    const currentUserId = getCurrentUserId();
+    const overdue = issues.filter(
+      (issue) =>
+        issue.dueDate &&
+        issue.status !== "Done" &&
+        new Date(issue.dueDate).getTime() < Date.now(),
+    );
+    const assigned = issues.filter(
+      (issue) => issue.assigneeId === currentUserId && issue.status !== "Done",
+    );
+    const open = issues.filter((issue) => issue.status !== "Done");
+    return {
+      overdue: overdue.slice(0, 3),
+      assigned: assigned.slice(0, 3),
+      open: open.slice(0, 3),
+    };
+  }, [issues]);
+
   const handleSaveFilter = async () => {
     if (!filterName) return;
     let finalQuery = query;
@@ -151,6 +180,89 @@ export default function SearchScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <ThemedText type="title">Search</ThemedText>
+      {activeTab === "all" && !isJqlMode ? (
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle">最近</ThemedText>
+          {!ready ? (
+            <Skeleton height={48} />
+          ) : recentIssues.length === 0 ? (
+            <EmptyState title="最近の課題はありません。" />
+          ) : (
+            recentIssues.map((issue) => (
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                onPress={() => router.push(`/issue/${issue.id}`)}
+              />
+            ))
+          )}
+          <ThemedText type="subtitle">保存済み</ThemedText>
+          {!ready ? (
+            <Skeleton height={32} />
+          ) : savedFilters.length === 0 ? (
+            <EmptyState title="保存済みフィルタはありません。" />
+          ) : (
+            savedFilters.slice(0, 3).map((filter) => (
+              <Pressable
+                key={filter.id}
+                onPress={() => {
+                  setIsJqlMode(filter.isJqlMode);
+                  setQuery(filter.query);
+                  setActiveTab("all");
+                }}
+                style={styles.savedFilterChip}
+              >
+                <ThemedText>{filter.name}</ThemedText>
+              </Pressable>
+            ))
+          )}
+          <ThemedText type="subtitle">おすすめ</ThemedText>
+          <ThemedView style={styles.recommendationGroup}>
+            <ThemedText style={styles.metaText}>期限切れ</ThemedText>
+            {recommendedIssues.overdue.length === 0 ? (
+              <ThemedText style={styles.metaText}>
+                期限切れの課題はありません。
+              </ThemedText>
+            ) : (
+              recommendedIssues.overdue.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  onPress={() => router.push(`/issue/${issue.id}`)}
+                />
+              ))
+            )}
+            <ThemedText style={styles.metaText}>自分の担当</ThemedText>
+            {recommendedIssues.assigned.length === 0 ? (
+              <ThemedText style={styles.metaText}>
+                担当中の課題はありません。
+              </ThemedText>
+            ) : (
+              recommendedIssues.assigned.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  onPress={() => router.push(`/issue/${issue.id}`)}
+                />
+              ))
+            )}
+            <ThemedText style={styles.metaText}>未完了</ThemedText>
+            {recommendedIssues.open.length === 0 ? (
+              <ThemedText style={styles.metaText}>
+                未完了の課題はありません。
+              </ThemedText>
+            ) : (
+              recommendedIssues.open.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  onPress={() => router.push(`/issue/${issue.id}`)}
+                />
+              ))
+            )}
+          </ThemedView>
+        </ThemedView>
+      ) : null}
       <ThemedView style={styles.tabRow}>
         <Pressable
           onPress={() => setIsJqlMode(false)}
@@ -210,6 +322,36 @@ export default function SearchScreen() {
             value={query}
             onChangeText={setQuery}
           />
+          {activeFilter || filterProjectId || query ? (
+            <ThemedView style={styles.chipRow}>
+              {query ? (
+                <Pressable onPress={() => setQuery("")} style={styles.chip}>
+                  <ThemedText>検索中: {query}</ThemedText>
+                </Pressable>
+              ) : null}
+              {activeFilter ? (
+                <Pressable
+                  onPress={() => setActiveFilter(null)}
+                  style={styles.chip}
+                >
+                  <ThemedText>
+                    {activeFilter === "assigned" ? "自分の担当" : "報告済み"}
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+              {filterProjectId ? (
+                <Pressable
+                  onPress={() => setFilterProjectId("")}
+                  style={styles.chip}
+                >
+                  <ThemedText>
+                    {projects.find((project) => project.id === filterProjectId)
+                      ?.name ?? "プロジェクト"}
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+            </ThemedView>
+          ) : null}
           <ThemedView style={styles.filterRow}>
             <Pressable
               onPress={() => setShowAdvanced((prev) => !prev)}
@@ -327,17 +469,19 @@ export default function SearchScreen() {
           <ThemedText style={styles.metaText}>
             結果: {filteredIssues.length}件
           </ThemedText>
-          {filteredIssues.map((issue) => (
-            <IssueCard
-              key={issue.id}
-              issue={issue}
-              onPress={() => router.push(`/issue/${issue.id}`)}
-            />
-          ))}
-          {!ready ? <ThemedText>Loading...</ThemedText> : null}
-          {ready && filteredIssues.length === 0 ? (
-            <ThemedText>No matches.</ThemedText>
-          ) : null}
+          {!ready ? (
+            <Skeleton height={48} />
+          ) : filteredIssues.length === 0 ? (
+            <EmptyState title="一致する課題がありません。" />
+          ) : (
+            filteredIssues.map((issue) => (
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                onPress={() => router.push(`/issue/${issue.id}`)}
+              />
+            ))
+          )}
         </ThemedView>
       )}
 
@@ -380,6 +524,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 24,
   },
+  chip: {
+    borderColor: "#e5e7eb",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   filterActive: {
     borderColor: "#2563eb",
   },
@@ -387,6 +543,7 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
+    minHeight: 44,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -406,12 +563,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#2563eb",
     borderRadius: 12,
+    minHeight: 44,
     paddingVertical: 10,
   },
   rowBetween: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  recommendationGroup: {
+    gap: 8,
+  },
+  savedFilterChip: {
+    borderColor: "#e5e7eb",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   metaText: {
     color: "#6b7280",
@@ -437,6 +605,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e5e7eb",
     borderRadius: 12,
     flex: 1,
+    minHeight: 44,
     paddingVertical: 10,
   },
   section: {
