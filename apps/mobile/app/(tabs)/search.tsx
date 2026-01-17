@@ -58,6 +58,10 @@ export default function SearchScreen() {
   const metaTextColor = useThemeColor({}, "textSecondary");
   const errorBorder = useThemeColor({}, "stateErrorText");
   const modalOverlayColor = useThemeColor({}, "surfaceOverlay");
+  const activeBg = useThemeColor({}, "stateInfoBg");
+  const activeBorder = useThemeColor({}, "brandPrimary");
+  const activeText = useThemeColor({}, "stateInfoText");
+  const inactiveText = useThemeColor({}, "textSecondary");
 
   useEffect(() => {
     if (!ready) return;
@@ -675,6 +679,11 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderRadius: Radius.l,
+  },
+  chipContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: Spacing.xs,
   },
   chipRow: {
     flexDirection: "row",

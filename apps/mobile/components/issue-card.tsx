@@ -4,7 +4,6 @@ import type { Issue } from "@repo/core";
 import { PRIORITY_LABELS, STATUS_LABELS, TYPE_LABELS } from "@repo/core";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { Chip } from "@/components/ui/chip";
 import { Elevation, Radius, Spacing } from "@/constants/theme";
 import { useThemeColor } from "@/hooks/use-theme-color";

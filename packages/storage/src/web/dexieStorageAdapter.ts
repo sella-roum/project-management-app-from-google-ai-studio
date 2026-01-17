@@ -322,6 +322,10 @@ export class DexieStorageAdapter implements AppStorage {
     return newUser;
   };
 
+  getUsers = async (): Promise<User[]> => {
+    return this.db.users.toArray();
+  };
+
   getUserById = async (id: string): Promise<User | undefined> => {
     return this.db.users.get(id);
   };

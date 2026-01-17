@@ -813,6 +813,9 @@ export class SQLiteStorageAdapter implements AppStorage {
     return newUser;
   };
 
+  getUsers = async (): Promise<User[]> =>
+    this.queryAll<User>("SELECT data FROM users");
+
   getUserById = async (id: string): Promise<User | null> =>
     this.queryFirst<User>("SELECT data FROM users WHERE id = ?", [id]);
 
