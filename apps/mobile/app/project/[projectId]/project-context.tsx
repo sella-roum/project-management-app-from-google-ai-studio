@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 
 import type { Issue, Project, ProjectStats, Sprint, Version } from "@repo/core";
-import { getIssues, getProjectById, getProjectStats, getSprints, getVersions } from "@repo/storage";
+import { buildProjectStats } from "@repo/core";
+import { USERS, getIssues, getProjectById, getSprints, getVersions } from "@repo/storage";
 
 import { useStorageReady } from "@/hooks/use-storage";
 
@@ -37,19 +38,17 @@ export function ProjectDataProvider({
 
   const reload = useCallback(async () => {
     if (!projectId) return;
-    const [projectData, issueData, sprintData, versionData, statsData] =
-      await Promise.all([
-        getProjectById(projectId),
-        getIssues(projectId),
-        getSprints(projectId),
-        getVersions(projectId),
-        getProjectStats(projectId),
-      ]);
+    const [projectData, issueData, sprintData, versionData] = await Promise.all([
+      getProjectById(projectId),
+      getIssues(projectId),
+      getSprints(projectId),
+      getVersions(projectId),
+    ]);
     setProject(projectData);
     setIssues(issueData);
     setSprints(sprintData);
     setVersions(versionData);
-    setStats(statsData);
+    setStats(buildProjectStats(issueData, USERS));
   }, [projectId]);
 
   useEffect(() => {

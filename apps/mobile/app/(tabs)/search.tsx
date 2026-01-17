@@ -23,6 +23,7 @@ import {
 } from "@repo/storage";
 
 import { EmptyState } from "@/components/empty-state";
+import { SearchSortRow, type SortOption, type SortKey } from "@/components/search-sort-row";
 import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -49,16 +50,12 @@ export default function SearchScreen() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [filterName, setFilterName] = useState("");
   const [jqlSuggestions, setJqlSuggestions] = useState<string[]>([]);
-  const [sortKey, setSortKey] = useState<"updated" | "created" | "priority">(
+  const [sortKey, setSortKey] = useState<SortKey>(
     "updated",
   );
   const borderSubtle = useThemeColor({}, "borderSubtle");
-  const activeBg = useThemeColor({}, "stateInfoBg");
-  const activeBorder = useThemeColor({}, "brandPrimary");
   const surfaceRaised = useThemeColor({}, "surfaceRaised");
   const metaTextColor = useThemeColor({}, "textSecondary");
-  const activeText = useThemeColor({}, "stateInfoText");
-  const inactiveText = useThemeColor({}, "textSecondary");
   const errorBorder = useThemeColor({}, "stateErrorText");
   const modalOverlayColor = useThemeColor({}, "surfaceOverlay");
 
@@ -193,52 +190,11 @@ export default function SearchScreen() {
     "createdAt",
     "dueDate",
   ];
-  const sortOptions: { key: "updated" | "created" | "priority"; label: string }[] = [
+  const sortOptions: SortOption[] = [
     { key: "updated", label: "更新日" },
     { key: "created", label: "作成日" },
     { key: "priority", label: "優先度" },
   ];
-
-  const SortRow = ({
-    sortKey: activeKey,
-    sortOptions: options,
-    onSortChange,
-  }: {
-    sortKey: "updated" | "created" | "priority";
-    sortOptions: { key: "updated" | "created" | "priority"; label: string }[];
-    onSortChange: (key: "updated" | "created" | "priority") => void;
-  }) => (
-    <ThemedView style={styles.sortRow}>
-      <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
-        並び替え
-      </ThemedText>
-      <ThemedView style={styles.sortOptions}>
-        {options.map((option) => {
-          const isActive = activeKey === option.key;
-          return (
-            <Pressable
-              key={option.key}
-              onPress={() => onSortChange(option.key)}
-              style={[
-                styles.sortChip,
-                { borderColor: borderSubtle },
-                isActive && { borderColor: activeBorder, backgroundColor: activeBg },
-              ]}
-            >
-              <View style={styles.chipContent}>
-                {isActive ? (
-                  <MaterialIcons name="check" size={16} color={activeText} />
-                ) : null}
-                <ThemedText type="caption" style={{ color: isActive ? activeText : inactiveText }}>
-                  {option.label}
-                </ThemedText>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ThemedView>
-    </ThemedView>
-  );
 
   const handleJqlChange = (value: string) => {
     setQuery(value);
@@ -412,7 +368,7 @@ export default function SearchScreen() {
               ))}
             </ThemedView>
           ) : null}
-          <SortRow
+          <SearchSortRow
             sortKey={sortKey}
             sortOptions={sortOptions}
             onSortChange={setSortKey}
@@ -597,7 +553,7 @@ export default function SearchScreen() {
               ))}
             </ThemedView>
           ) : null}
-          <SortRow
+          <SearchSortRow
             sortKey={sortKey}
             sortOptions={sortOptions}
             onSortChange={setSortKey}
@@ -720,11 +676,6 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: Radius.l,
   },
-  chipContent: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: Spacing.xs,
-  },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -802,20 +753,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.s,
   },
   suggestions: {
-    gap: Spacing.s,
-  },
-  sortChip: {
-    borderRadius: Radius.l,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.m,
-    paddingVertical: Spacing.xs,
-  },
-  sortOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.s,
-  },
-  sortRow: {
     gap: Spacing.s,
   },
   tab: {

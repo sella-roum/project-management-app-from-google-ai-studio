@@ -21,6 +21,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [key, setKey] = useState("");
   const [type, setType] = useState<"Scrum" | "Kanban">("Kanban");
   const [loading, setLoading] = useState(false);
+  const trimmedName = name.trim();
   const borderSubtle = useThemeColor({}, "borderSubtle");
   const activeBorder = useThemeColor({}, "brandPrimary");
   const activeBackground = useThemeColor({}, "stateInfoBg");
@@ -30,7 +31,6 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const progressTrack = useThemeColor({}, "surfaceOverlay");
 
   const handleFinish = async () => {
-    const trimmedName = name.trim();
     if (!trimmedName) {
       Alert.alert("入力エラー", "プロジェクト名を入力してください。");
       return;
@@ -89,7 +89,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             maxLength={5}
             autoCapitalize="characters"
           />
-          <Button label="次へ" onPress={() => setStep(2)} disabled={!name} />
+          <Button
+            label="次へ"
+            onPress={() => setStep(2)}
+            disabled={!trimmedName}
+          />
         </ThemedView>
       ) : step === 2 ? (
         <ThemedView
@@ -132,7 +136,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             <Button
               label="開始する"
               onPress={handleFinish}
-              disabled={!name}
+              disabled={!trimmedName}
               loading={loading}
             />
           </ThemedView>

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { Issue } from "@repo/core";
 import { PRIORITY_LABELS, STATUS_LABELS, TYPE_LABELS } from "@repo/core";
@@ -52,7 +52,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
         { backgroundColor: cardBackground, borderColor: subtleBorder },
       ]}
     >
-      <ThemedView style={styles.rowBetween}>
+      <View style={styles.rowBetween}>
         <ThemedText style={[styles.issueKey, { color: mutedText }]}>
           {issue.key}
         </ThemedText>
@@ -62,11 +62,11 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
           backgroundColor={STATUS_COLORS[issue.status] ?? "#94a3b8"}
           textColor={textOnBrand}
         />
-      </ThemedView>
+      </View>
       <ThemedText numberOfLines={2} style={styles.issueTitle}>
         {issue.title}
       </ThemedText>
-      <ThemedView style={styles.metaRow}>
+      <View style={styles.metaRow}>
         <Chip label={TYPE_LABELS[issue.type]} />
         <Chip
           label={PRIORITY_LABELS[issue.priority]}
@@ -88,7 +88,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
             textColor={errorText}
           />
         ) : null}
-      </ThemedView>
+      </View>
     </Pressable>
   );
 }

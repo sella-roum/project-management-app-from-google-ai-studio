@@ -60,17 +60,21 @@ export default function ModalScreen() {
     void load();
   }, [ready, projectId]);
 
+  const trimmedTitle = title.trim();
+  const trimmedDescription = description.trim();
+  const trimmedProjectName = projectName.trim();
+  const trimmedProjectKey = projectKey.trim().toUpperCase();
   const canSubmitIssue = useMemo(
-    () => selectedProjectId && title.trim().length > 0,
-    [selectedProjectId, title],
+    () => selectedProjectId && trimmedTitle.length > 0,
+    [selectedProjectId, trimmedTitle],
   );
 
   const handleCreateIssue = async () => {
     if (!canSubmitIssue) return;
     await createIssue({
       projectId: selectedProjectId,
-      title,
-      description,
+      title: trimmedTitle,
+      description: trimmedDescription,
       type: issueType,
       status,
       priority,
@@ -80,14 +84,16 @@ export default function ModalScreen() {
   };
 
   const handleCreateProject = async () => {
-    if (!projectName) return;
+    if (!trimmedProjectName) return;
+    const fallbackKey = trimmedProjectName.substring(0, 3).toUpperCase();
+    const safeKey = (trimmedProjectKey || fallbackKey).toUpperCase();
     await createProject({
-      name: projectName,
-      key: projectKey || projectName.substring(0, 3).toUpperCase(),
+      name: trimmedProjectName,
+      key: safeKey,
       type: projectType,
       category: projectCategory,
       iconUrl: undefined,
-      description,
+      description: trimmedDescription,
       leadId: getCurrentUserId(),
     });
     router.back();
