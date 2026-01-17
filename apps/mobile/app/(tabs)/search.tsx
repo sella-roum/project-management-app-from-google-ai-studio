@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Modal,
+  LayoutAnimation,
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
+  View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import type { Issue, SavedFilter } from "@repo/core";
 import { executeJQL } from "@repo/core";
@@ -25,7 +27,12 @@ import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IssueCard } from "@/components/issue-card";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { Input } from "@/components/ui/input";
+import { Elevation, Radius, Spacing } from "@/constants/theme";
 import { useStorageReady } from "@/hooks/use-storage";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -42,6 +49,16 @@ export default function SearchScreen() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [filterName, setFilterName] = useState("");
   const [jqlSuggestions, setJqlSuggestions] = useState<string[]>([]);
+  const [sortKey, setSortKey] = useState<"updated" | "created" | "priority">(
+    "updated",
+  );
+  const borderSubtle = useThemeColor({}, "borderSubtle");
+  const activeBg = useThemeColor({}, "stateInfoBg");
+  const activeBorder = useThemeColor({}, "brandPrimary");
+  const surfaceRaised = useThemeColor({}, "surfaceRaised");
+  const metaTextColor = useThemeColor({}, "textSecondary");
+  const activeText = useThemeColor({}, "stateInfoText");
+  const inactiveText = useThemeColor({}, "textSecondary");
 
   useEffect(() => {
     if (!ready) return;
@@ -89,8 +106,25 @@ export default function SearchScreen() {
       }
     }
 
-    return results;
-  }, [issues, isJqlMode, query, activeFilter, filterProjectId]);
+    const priorityOrder = ["Highest", "High", "Medium", "Low", "Lowest"];
+    const sorted = [...results].sort((a, b) => {
+      if (sortKey === "created") {
+        return b.createdAt.localeCompare(a.createdAt);
+      }
+      if (sortKey === "priority") {
+        return (
+          priorityOrder.indexOf(a.priority) -
+          priorityOrder.indexOf(b.priority)
+        );
+      }
+      return b.updatedAt.localeCompare(a.updatedAt);
+    });
+    return sorted;
+  }, [issues, isJqlMode, query, activeFilter, filterProjectId, sortKey]);
+
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [filteredIssues.length, activeTab, isJqlMode]);
 
   const recentIssues = useMemo(
     () =>
@@ -155,6 +189,11 @@ export default function SearchScreen() {
     "createdAt",
     "dueDate",
   ];
+  const sortOptions: { key: "updated" | "created" | "priority"; label: string }[] = [
+    { key: "updated", label: "更新日" },
+    { key: "created", label: "作成日" },
+    { key: "priority", label: "優先度" },
+  ];
 
   const handleJqlChange = (value: string) => {
     setQuery(value);
@@ -182,45 +221,54 @@ export default function SearchScreen() {
       <ThemedText type="title">Search</ThemedText>
       {activeTab === "all" && !isJqlMode ? (
         <ThemedView style={styles.section}>
-          <ThemedText type="subtitle">最近</ThemedText>
-          {!ready ? (
-            <Skeleton height={48} />
-          ) : recentIssues.length === 0 ? (
-            <EmptyState title="最近の課題はありません。" />
-          ) : (
-            recentIssues.map((issue) => (
-              <IssueCard
-                key={issue.id}
-                issue={issue}
-                onPress={() => router.push(`/issue/${issue.id}`)}
-              />
-            ))
-          )}
-          <ThemedText type="subtitle">保存済み</ThemedText>
-          {!ready ? (
-            <Skeleton height={32} />
-          ) : savedFilters.length === 0 ? (
-            <EmptyState title="保存済みフィルタはありません。" />
-          ) : (
-            savedFilters.slice(0, 3).map((filter) => (
-              <Pressable
-                key={filter.id}
-                onPress={() => {
-                  setIsJqlMode(filter.isJqlMode);
-                  setQuery(filter.query);
-                  setActiveTab("all");
-                }}
-                style={styles.savedFilterChip}
-              >
-                <ThemedText>{filter.name}</ThemedText>
-              </Pressable>
-            ))
-          )}
-          <ThemedText type="subtitle">おすすめ</ThemedText>
+          <ThemedView style={styles.quickAccess}>
+            <ThemedView style={styles.quickSection}>
+              <ThemedText type="headline">直近の検索</ThemedText>
+              {!ready ? (
+                <Skeleton height={48} />
+              ) : recentIssues.length === 0 ? (
+                <EmptyState title="最近の課題はありません。" />
+              ) : (
+                recentIssues.map((issue) => (
+                  <IssueCard
+                    key={issue.id}
+                    issue={issue}
+                    onPress={() => router.push(`/issue/${issue.id}`)}
+                  />
+                ))
+              )}
+            </ThemedView>
+            <ThemedView style={styles.quickSection}>
+              <ThemedText type="headline">保存済みフィルタ</ThemedText>
+              {!ready ? (
+                <Skeleton height={32} />
+              ) : savedFilters.length === 0 ? (
+                <EmptyState title="保存済みフィルタはありません。" />
+              ) : (
+                <ThemedView style={styles.savedFilterRow}>
+                  {savedFilters.slice(0, 3).map((filter) => (
+                    <Pressable
+                      key={filter.id}
+                      onPress={() => {
+                        setIsJqlMode(filter.isJqlMode);
+                        setQuery(filter.query);
+                        setActiveTab("all");
+                      }}
+                    >
+                      <Chip label={filter.name} style={styles.savedFilterChip} />
+                    </Pressable>
+                  ))}
+                </ThemedView>
+              )}
+            </ThemedView>
+          </ThemedView>
+          <ThemedText type="headline">おすすめ</ThemedText>
           <ThemedView style={styles.recommendationGroup}>
-            <ThemedText style={styles.metaText}>期限切れ</ThemedText>
+            <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
+              期限切れ
+            </ThemedText>
             {recommendedIssues.overdue.length === 0 ? (
-              <ThemedText style={styles.metaText}>
+              <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
                 期限切れの課題はありません。
               </ThemedText>
             ) : (
@@ -232,9 +280,11 @@ export default function SearchScreen() {
                 />
               ))
             )}
-            <ThemedText style={styles.metaText}>自分の担当</ThemedText>
+            <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
+              自分の担当
+            </ThemedText>
             {recommendedIssues.assigned.length === 0 ? (
-              <ThemedText style={styles.metaText}>
+              <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
                 担当中の課題はありません。
               </ThemedText>
             ) : (
@@ -246,9 +296,11 @@ export default function SearchScreen() {
                 />
               ))
             )}
-            <ThemedText style={styles.metaText}>未完了</ThemedText>
+            <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
+              未完了
+            </ThemedText>
             {recommendedIssues.open.length === 0 ? (
-              <ThemedText style={styles.metaText}>
+              <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
                 未完了の課題はありません。
               </ThemedText>
             ) : (
@@ -266,21 +318,29 @@ export default function SearchScreen() {
       <ThemedView style={styles.tabRow}>
         <Pressable
           onPress={() => setIsJqlMode(false)}
-          style={[styles.tab, !isJqlMode && styles.tabActive]}
+          style={[
+            styles.tab,
+            { borderColor: borderSubtle },
+            !isJqlMode && { borderColor: activeBorder, backgroundColor: activeBg },
+          ]}
         >
-          <ThemedText>ベーシック</ThemedText>
+          <ThemedText type="body">ベーシック</ThemedText>
         </Pressable>
         <Pressable
           onPress={() => setIsJqlMode(true)}
-          style={[styles.tab, isJqlMode && styles.tabActive]}
+          style={[
+            styles.tab,
+            { borderColor: borderSubtle },
+            isJqlMode && { borderColor: activeBorder, backgroundColor: activeBg },
+          ]}
         >
-          <ThemedText>JQL</ThemedText>
+          <ThemedText type="body">JQL</ThemedText>
         </Pressable>
         <Pressable
           onPress={() => setActiveTab(activeTab === "all" ? "saved" : "all")}
-          style={styles.tab}
+          style={[styles.tab, { borderColor: borderSubtle }]}
         >
-          <ThemedText>
+          <ThemedText type="body">
             {activeTab === "saved" ? "検索に戻る" : "保存済み"}
           </ThemedText>
         </Pressable>
@@ -288,12 +348,12 @@ export default function SearchScreen() {
 
       {isJqlMode ? (
         <ThemedView style={styles.section}>
-          <TextInput
-            style={styles.textArea}
+          <Input
             placeholder="status = Done AND priority = Highest"
             value={query}
             onChangeText={handleJqlChange}
             multiline
+            style={styles.textArea}
           />
           {jqlSuggestions.length > 0 ? (
             <ThemedView style={styles.suggestions}>
@@ -307,17 +367,41 @@ export default function SearchScreen() {
               ))}
             </ThemedView>
           ) : null}
-          <Pressable
-            onPress={() => setSaveModalOpen(true)}
-            style={styles.primaryButton}
-          >
-            <ThemedText type="link">この検索を保存</ThemedText>
-          </Pressable>
+          <ThemedView style={styles.sortRow}>
+            <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
+              並び替え
+            </ThemedText>
+            <ThemedView style={styles.sortOptions}>
+              {sortOptions.map((option) => {
+                const isActive = sortKey === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => setSortKey(option.key)}
+                    style={[
+                      styles.sortChip,
+                      { borderColor: borderSubtle },
+                      isActive && { borderColor: activeBorder, backgroundColor: activeBg },
+                    ]}
+                  >
+                    <View style={styles.chipContent}>
+                      {isActive ? (
+                        <MaterialIcons name="check" size={16} color={activeText} />
+                      ) : null}
+                      <ThemedText type="caption" style={{ color: isActive ? activeText : inactiveText }}>
+                        {option.label}
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ThemedView>
+          </ThemedView>
+          <Button label="この検索を保存" onPress={() => setSaveModalOpen(true)} />
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="課題キー、タイトルを検索..."
             value={query}
             onChangeText={setQuery}
@@ -325,29 +409,31 @@ export default function SearchScreen() {
           {activeFilter || filterProjectId || query ? (
             <ThemedView style={styles.chipRow}>
               {query ? (
-                <Pressable onPress={() => setQuery("")} style={styles.chip}>
-                  <ThemedText>検索中: {query}</ThemedText>
+                <Pressable onPress={() => setQuery("")}>
+                  <Chip label={`検索中: ${query}`} style={styles.chip} />
                 </Pressable>
               ) : null}
               {activeFilter ? (
                 <Pressable
                   onPress={() => setActiveFilter(null)}
-                  style={styles.chip}
                 >
-                  <ThemedText>
-                    {activeFilter === "assigned" ? "自分の担当" : "報告済み"}
-                  </ThemedText>
+                  <Chip
+                    label={activeFilter === "assigned" ? "自分の担当" : "報告済み"}
+                    style={styles.chip}
+                  />
                 </Pressable>
               ) : null}
               {filterProjectId ? (
                 <Pressable
                   onPress={() => setFilterProjectId("")}
-                  style={styles.chip}
                 >
-                  <ThemedText>
-                    {projects.find((project) => project.id === filterProjectId)
-                      ?.name ?? "プロジェクト"}
-                  </ThemedText>
+                  <Chip
+                    label={
+                      projects.find((project) => project.id === filterProjectId)
+                        ?.name ?? "プロジェクト"
+                    }
+                    style={styles.chip}
+                  />
                 </Pressable>
               ) : null}
             </ThemedView>
@@ -357,53 +443,109 @@ export default function SearchScreen() {
               onPress={() => setShowAdvanced((prev) => !prev)}
               style={[
                 styles.filterButton,
-                showAdvanced && styles.filterActive,
+                { borderColor: borderSubtle },
+                showAdvanced && { borderColor: activeBorder, backgroundColor: activeBg },
               ]}
             >
-              <ThemedText>詳細</ThemedText>
+              <View style={styles.chipContent}>
+                {showAdvanced ? (
+                  <MaterialIcons name="check" size={16} color={activeText} />
+                ) : null}
+                <ThemedText type="body" style={{ color: showAdvanced ? activeText : inactiveText }}>
+                  詳細
+                </ThemedText>
+              </View>
             </Pressable>
             <Pressable
               onPress={() => setActiveFilter("assigned")}
               style={[
                 styles.filterButton,
-                activeFilter === "assigned" && styles.filterActive,
+                { borderColor: borderSubtle },
+                activeFilter === "assigned" && {
+                  borderColor: activeBorder,
+                  backgroundColor: activeBg,
+                },
               ]}
             >
-              <ThemedText>Assigned</ThemedText>
+              <View style={styles.chipContent}>
+                {activeFilter === "assigned" ? (
+                  <MaterialIcons name="check" size={16} color={activeText} />
+                ) : null}
+                <ThemedText
+                  type="body"
+                  style={{
+                    color: activeFilter === "assigned" ? activeText : inactiveText,
+                  }}
+                >
+                  Assigned
+                </ThemedText>
+              </View>
             </Pressable>
             <Pressable
               onPress={() => setActiveFilter("reported")}
               style={[
                 styles.filterButton,
-                activeFilter === "reported" && styles.filterActive,
+                { borderColor: borderSubtle },
+                activeFilter === "reported" && {
+                  borderColor: activeBorder,
+                  backgroundColor: activeBg,
+                },
               ]}
             >
-              <ThemedText>Reported</ThemedText>
+              <View style={styles.chipContent}>
+                {activeFilter === "reported" ? (
+                  <MaterialIcons name="check" size={16} color={activeText} />
+                ) : null}
+                <ThemedText
+                  type="body"
+                  style={{
+                    color: activeFilter === "reported" ? activeText : inactiveText,
+                  }}
+                >
+                  Reported
+                </ThemedText>
+              </View>
             </Pressable>
             <Pressable
               onPress={() => setActiveFilter(null)}
-              style={styles.filterButton}
+              style={[styles.filterButton, { borderColor: borderSubtle }]}
             >
-              <ThemedText>Clear</ThemedText>
+              <ThemedText type="body">Clear</ThemedText>
             </Pressable>
             <Pressable
               onPress={() => setSaveModalOpen(true)}
-              style={styles.filterButton}
+              style={[styles.filterButton, { borderColor: borderSubtle }]}
             >
-              <ThemedText>保存</ThemedText>
+              <ThemedText type="body">保存</ThemedText>
             </Pressable>
           </ThemedView>
           {showAdvanced ? (
             <ThemedView style={styles.section}>
-              <ThemedText type="subtitle">Project</ThemedText>
+              <ThemedText type="headline">Project</ThemedText>
               <Pressable
                 onPress={() => setFilterProjectId("")}
                 style={[
                   styles.filterButton,
-                  filterProjectId === "" && styles.filterActive,
+                  { borderColor: borderSubtle },
+                  filterProjectId === "" && {
+                    borderColor: activeBorder,
+                    backgroundColor: activeBg,
+                  },
                 ]}
               >
-                <ThemedText>すべてのプロジェクト</ThemedText>
+                <View style={styles.chipContent}>
+                  {filterProjectId === "" ? (
+                    <MaterialIcons name="check" size={16} color={activeText} />
+                  ) : null}
+                  <ThemedText
+                    type="body"
+                    style={{
+                      color: filterProjectId === "" ? activeText : inactiveText,
+                    }}
+                  >
+                    すべてのプロジェクト
+                  </ThemedText>
+                </View>
               </Pressable>
               {projects.map((project) => (
                 <Pressable
@@ -411,24 +553,76 @@ export default function SearchScreen() {
                   onPress={() => setFilterProjectId(project.id)}
                   style={[
                     styles.filterButton,
-                    filterProjectId === project.id && styles.filterActive,
+                    { borderColor: borderSubtle },
+                    filterProjectId === project.id && {
+                      borderColor: activeBorder,
+                      backgroundColor: activeBg,
+                    },
                   ]}
                 >
-                  <ThemedText>{project.name}</ThemedText>
+                  <View style={styles.chipContent}>
+                    {filterProjectId === project.id ? (
+                      <MaterialIcons name="check" size={16} color={activeText} />
+                    ) : null}
+                    <ThemedText
+                      type="body"
+                      style={{
+                        color: filterProjectId === project.id ? activeText : inactiveText,
+                      }}
+                    >
+                      {project.name}
+                    </ThemedText>
+                  </View>
                 </Pressable>
               ))}
             </ThemedView>
           ) : null}
+          <ThemedView style={styles.sortRow}>
+            <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
+              並び替え
+            </ThemedText>
+            <ThemedView style={styles.sortOptions}>
+              {sortOptions.map((option) => {
+                const isActive = sortKey === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => setSortKey(option.key)}
+                    style={[
+                      styles.sortChip,
+                      { borderColor: borderSubtle },
+                      isActive && { borderColor: activeBorder, backgroundColor: activeBg },
+                    ]}
+                  >
+                    <View style={styles.chipContent}>
+                      {isActive ? (
+                        <MaterialIcons name="check" size={16} color={activeText} />
+                      ) : null}
+                      <ThemedText type="caption" style={{ color: isActive ? activeText : inactiveText }}>
+                        {option.label}
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ThemedView>
+          </ThemedView>
         </ThemedView>
       )}
 
       {activeTab === "saved" ? (
         <ThemedView style={styles.section}>
           {savedFilters.length === 0 ? (
-            <ThemedText>保存済みフィルタはありません。</ThemedText>
+            <ThemedText type="body">保存済みフィルタはありません。</ThemedText>
           ) : (
             savedFilters.map((filter) => (
-              <ThemedView key={filter.id} style={styles.card}>
+              <ThemedView
+                key={filter.id}
+                style={[
+                  styles.card,
+                  { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+                ]}
+              >
                 <Pressable
                   onPress={() => {
                     setIsJqlMode(filter.isJqlMode);
@@ -436,8 +630,8 @@ export default function SearchScreen() {
                     setActiveTab("all");
                   }}
                 >
-                  <ThemedText type="defaultSemiBold">{filter.name}</ThemedText>
-                  <ThemedText>{filter.query}</ThemedText>
+                  <ThemedText type="bodySemiBold">{filter.name}</ThemedText>
+                  <ThemedText type="caption">{filter.query}</ThemedText>
                 </Pressable>
                 <ThemedView style={styles.savedFilterActions}>
                   <Pressable
@@ -446,18 +640,26 @@ export default function SearchScreen() {
                     }
                     style={[
                       styles.savedFilterAction,
-                      filter.isFavorite && styles.savedFilterActionActive,
+                      { borderColor: borderSubtle },
+                      filter.isFavorite && {
+                        borderColor: activeBorder,
+                        backgroundColor: activeBg,
+                      },
                     ]}
                   >
-                    <ThemedText>
+                    <ThemedText type="body">
                       {filter.isFavorite ? "★ お気に入り" : "☆ お気に入り"}
                     </ThemedText>
                   </Pressable>
                   <Pressable
                     onPress={() => handleDeleteFilter(filter.id)}
-                    style={[styles.savedFilterAction, styles.savedFilterDelete]}
+                    style={[
+                      styles.savedFilterAction,
+                      { borderColor: borderSubtle },
+                      styles.savedFilterDelete,
+                    ]}
                   >
-                    <ThemedText>削除</ThemedText>
+                    <ThemedText type="body">削除</ThemedText>
                   </Pressable>
                 </ThemedView>
               </ThemedView>
@@ -466,7 +668,7 @@ export default function SearchScreen() {
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
-          <ThemedText style={styles.metaText}>
+          <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
             結果: {filteredIssues.length}件
           </ThemedText>
           {!ready ? (
@@ -491,24 +693,20 @@ export default function SearchScreen() {
         onRequestClose={() => setSaveModalOpen(false)}
       >
         <ThemedView style={styles.modalOverlay}>
-          <ThemedView style={styles.modalCard}>
-            <ThemedText type="subtitle">保存済みフィルタ</ThemedText>
-            <TextInput
-              style={styles.input}
+          <ThemedView style={[styles.modalCard, { backgroundColor: surfaceRaised }]}>
+            <ThemedText type="headline">保存済みフィルタ</ThemedText>
+            <Input
               placeholder="保存名"
               value={filterName}
               onChangeText={setFilterName}
             />
             <ThemedView style={styles.rowBetween}>
-              <Pressable
+              <Button
+                label="キャンセル"
                 onPress={() => setSaveModalOpen(false)}
-                style={styles.secondaryButton}
-              >
-                <ThemedText>キャンセル</ThemedText>
-              </Pressable>
-              <Pressable onPress={handleSaveFilter} style={styles.primaryButton}>
-                <ThemedText type="link">保存</ThemedText>
-              </Pressable>
+                variant="secondary"
+              />
+              <Button label="保存" onPress={handleSaveFilter} />
             </ThemedView>
           </ThemedView>
         </ThemedView>
@@ -520,140 +718,134 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    gap: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    gap: Spacing.l,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.xl,
   },
   chip: {
-    borderColor: "#e5e7eb",
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: Radius.l,
+  },
+  chipContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: Spacing.xs,
   },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-  },
-  filterActive: {
-    borderColor: "#2563eb",
+    gap: Spacing.s,
   },
   filterButton: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
+    borderRadius: Radius.m,
     borderWidth: 1,
     minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: Spacing.m,
+    paddingVertical: Spacing.s,
   },
   filterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-  },
-  input: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    minHeight: 44,
-    paddingVertical: 10,
+    gap: Spacing.s,
   },
   rowBetween: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: Spacing.s,
   },
   recommendationGroup: {
-    gap: 8,
+    gap: Spacing.s,
   },
   savedFilterChip: {
-    borderColor: "#e5e7eb",
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: Radius.l,
   },
   metaText: {
-    color: "#6b7280",
     fontSize: 12,
   },
   modalCard: {
-    borderRadius: 16,
-    gap: 12,
-    padding: 16,
+    borderRadius: Radius.l,
+    gap: Spacing.m,
+    padding: Spacing.l,
+    ...Elevation.medium,
   },
   modalOverlay: {
     backgroundColor: "rgba(15, 23, 42, 0.6)",
     bottom: 0,
     justifyContent: "center",
     left: 0,
-    padding: 24,
+    padding: Spacing.xl,
     position: "absolute",
     right: 0,
     top: 0,
   },
-  secondaryButton: {
-    alignItems: "center",
-    backgroundColor: "#e5e7eb",
-    borderRadius: 12,
-    flex: 1,
-    minHeight: 44,
-    paddingVertical: 10,
+  quickAccess: {
+    gap: Spacing.l,
+  },
+  quickSection: {
+    gap: Spacing.s,
   },
   section: {
-    gap: 12,
+    gap: Spacing.m,
+  },
+  savedFilterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.s,
   },
   savedFilterAction: {
-    borderColor: "#e5e7eb",
-    borderRadius: 999,
+    borderRadius: Radius.l,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  savedFilterActionActive: {
-    borderColor: "#2563eb",
+    paddingHorizontal: Spacing.m,
+    paddingVertical: Spacing.s,
   },
   savedFilterActions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 8,
+    gap: Spacing.s,
+    marginTop: Spacing.s,
   },
   savedFilterDelete: {
     borderColor: "#fca5a5",
   },
   suggestions: {
-    gap: 6,
+    gap: Spacing.s,
+  },
+  sortChip: {
+    borderRadius: Radius.l,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.m,
+    paddingVertical: Spacing.xs,
+  },
+  sortOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.s,
+  },
+  sortRow: {
+    gap: Spacing.s,
   },
   tab: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
+    borderRadius: Radius.m,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  tabActive: {
-    borderColor: "#2563eb",
+    paddingHorizontal: Spacing.m,
+    paddingVertical: Spacing.s,
   },
   tabRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: Spacing.s,
   },
   textArea: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
+    borderRadius: Radius.m,
     borderWidth: 1,
     minHeight: 120,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: Spacing.m,
+    paddingVertical: Spacing.s,
+  },
+  card: {
+    borderRadius: Radius.l,
+    borderWidth: 1,
+    gap: Spacing.s,
+    padding: Spacing.l,
   },
 });

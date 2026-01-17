@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from "expo-router";
-import React from "react";
+import * as React from "react";
 import { StyleSheet, View } from "react-native";
 
 import { FloatingActionButton } from "@/components/floating-action-button";

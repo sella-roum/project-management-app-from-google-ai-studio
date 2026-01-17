@@ -117,7 +117,9 @@ export class SQLiteStorageAdapter implements AppStorage {
       listByProject: (projectId) => this.listIssuesInternal(projectId),
       create: (input) => this.createIssueInternal(input),
       update: (id, patch) => this.updateIssue(id, patch),
-      updateStatus: (id, status) => this.updateIssueStatus(id, status),
+      updateStatus: async (id, status) => {
+        await this.updateIssueStatus(id, status);
+      },
       remove: (id) => this.removeIssueInternal(id),
       watchAll: (listener) => this.watchIssues(listener),
       watchById: (id, listener) => this.watchIssue(id, listener),
@@ -126,8 +128,12 @@ export class SQLiteStorageAdapter implements AppStorage {
     this.sprints = {
       listByProject: (projectId) => this.listSprintsInternal(projectId),
       create: (input) => this.createSprintInternal(input),
-      start: (id) => this.updateSprintInternal(id, { status: "active" }),
-      complete: (id) => this.updateSprintInternal(id, { status: "completed" }),
+      start: async (id) => {
+        await this.updateSprintInternal(id, { status: "active" });
+      },
+      complete: async (id) => {
+        await this.updateSprintInternal(id, { status: "completed" });
+      },
       watchAll: (listener) => this.watchSprints(listener),
       watchById: (id, listener) => this.watchSprint(id, listener),
     };
@@ -349,18 +355,21 @@ export class SQLiteStorageAdapter implements AppStorage {
     this.queryFirst<Project>("SELECT data FROM projects WHERE id = ?", [id]);
 
   private createProjectInternal = async (
-    input: Omit<Project, "id"> & { id?: ID },
+    input: Partial<Project> & { id?: ID },
   ): Promise<Project> => {
     const id = input.id ?? `p-${Date.now()}`;
     const project: Project = {
       id,
-      leadId: "u1",
-      category: "Software",
-      type: "Kanban",
-      starred: false,
-      workflowSettings: WORKFLOW_TRANSITIONS,
-      notificationSettings: DEFAULT_NOTIFICATION_SCHEME,
-      ...input,
+      name: input.name ?? "New project",
+      key: input.key ?? "PRJ",
+      description: input.description ?? "",
+      leadId: input.leadId ?? this.getCurrentUserId(),
+      category: input.category ?? "Software",
+      type: input.type ?? "Kanban",
+      starred: input.starred ?? false,
+      iconUrl: input.iconUrl,
+      workflowSettings: input.workflowSettings ?? WORKFLOW_TRANSITIONS,
+      notificationSettings: input.notificationSettings ?? DEFAULT_NOTIFICATION_SCHEME,
     };
     const db = await this.getDb();
     await db.runAsync(
@@ -597,10 +606,7 @@ export class SQLiteStorageAdapter implements AppStorage {
       id: input.id ?? `s-${Date.now()}`,
       projectId: input.projectId,
       name: input.name,
-      status: input.status ?? "planning",
-      startDate: input.startDate,
-      endDate: input.endDate,
-      goal: input.goal,
+      status: input.status ?? "future",
     };
     const db = await this.getDb();
     await db.runAsync(
@@ -847,7 +853,7 @@ export class SQLiteStorageAdapter implements AppStorage {
     this.getProjectByIdInternal(id);
 
   createProject = async (
-    project: Omit<Project, "id"> & { id?: ID },
+    project: Partial<Project> & { id?: ID },
   ): Promise<Project> => this.createProjectInternal(project);
 
   updateProject = async (

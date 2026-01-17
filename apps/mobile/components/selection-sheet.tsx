@@ -3,6 +3,9 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/button";
+import { Radius, Spacing } from "@/constants/theme";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 type SelectionOption = {
   label: string;
@@ -13,6 +16,7 @@ type SelectionSheetProps = {
   visible: boolean;
   title: string;
   options: SelectionOption[];
+  selectedValue?: string;
   onSelect: (value: string) => void;
   onClose: () => void;
 };
@@ -21,14 +25,21 @@ export function SelectionSheet({
   visible,
   title,
   options,
+  selectedValue,
   onSelect,
   onClose,
 }: SelectionSheetProps) {
+  const sheetBackground = useThemeColor({}, "surfaceRaised");
+  const borderSubtle = useThemeColor({}, "borderSubtle");
+  const selectedBackground = useThemeColor({}, "stateInfoBg");
+  const selectedBorder = useThemeColor({}, "brandPrimary");
+  const selectedText = useThemeColor({}, "brandPrimary");
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <ThemedView style={styles.overlay}>
-        <ThemedView style={styles.sheet}>
-          <ThemedText type="subtitle">{title}</ThemedText>
+        <ThemedView style={[styles.sheet, { backgroundColor: sheetBackground }]}>
+          <ThemedText type="headline">{title}</ThemedText>
           {options.map((option) => (
             <Pressable
               key={option.value}
@@ -36,14 +47,27 @@ export function SelectionSheet({
                 void Haptics.selectionAsync();
                 onSelect(option.value);
               }}
-              style={styles.option}
+              style={[
+                styles.option,
+                {
+                  borderColor:
+                    option.value === selectedValue ? selectedBorder : borderSubtle,
+                  backgroundColor:
+                    option.value === selectedValue ? selectedBackground : "transparent",
+                },
+              ]}
             >
-              <ThemedText>{option.label}</ThemedText>
+              <ThemedText
+                type="body"
+                style={
+                  option.value === selectedValue ? { color: selectedText } : undefined
+                }
+              >
+                {option.label}
+              </ThemedText>
             </Pressable>
           ))}
-          <Pressable onPress={onClose} style={styles.secondaryButton}>
-            <ThemedText>閉じる</ThemedText>
-          </Pressable>
+          <Button label="閉じる" onPress={onClose} variant="secondary" fullWidth />
         </ThemedView>
       </ThemedView>
     </Modal>
@@ -52,31 +76,21 @@ export function SelectionSheet({
 
 const styles = StyleSheet.create({
   option: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
+    borderRadius: Radius.m,
     borderWidth: 1,
     minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: Spacing.m,
+    paddingVertical: Spacing.s,
   },
   overlay: {
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(15, 23, 42, 0.5)",
   },
-  secondaryButton: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
   sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    gap: 12,
-    padding: 20,
+    borderTopLeftRadius: Radius.l,
+    borderTopRightRadius: Radius.l,
+    gap: Spacing.m,
+    padding: Spacing.l,
   },
 });

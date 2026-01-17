@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
-import { Modal, StyleSheet, View } from "react-native";
+import { Modal, Platform, StyleSheet, UIManager, View } from "react-native";
 
 import { SetupWizard } from "@/components/setup-wizard";
 
@@ -38,6 +38,12 @@ export default function RootLayout() {
     };
   }, [segments]);
 
+  useEffect(() => {
+    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
   const handleSetupComplete = () => {
     setShowSetupWizard(false);
     router.replace("/(tabs)/home");
@@ -45,7 +51,12 @@ export default function RootLayout() {
 
   return (
     <View style={styles.container}>
-      <Stack>
+      <Stack
+        screenOptions={{
+          animation: "default",
+          animationDuration: 250,
+        }}
+      >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="issue/[issueId]" options={{ title: "Issue" }} />

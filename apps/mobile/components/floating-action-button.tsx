@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, ViewStyle } from "react-native";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Elevation } from "@/constants/theme";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 type FloatingActionButtonProps = {
   onPress: () => void;
@@ -13,18 +15,22 @@ export function FloatingActionButton({
   accessibilityLabel,
   style,
 }: FloatingActionButtonProps) {
+  const fabBackground = useThemeColor({}, "brandPrimary");
+  const iconColor = useThemeColor({}, "textOnBrand");
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.fab,
+        Elevation.medium,
+        { backgroundColor: fabBackground },
         pressed && styles.fabPressed,
         style,
       ]}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
     >
-      <IconSymbol size={28} name="plus" color="#fff" />
+      <IconSymbol size={28} name="plus" color={iconColor} />
     </Pressable>
   );
 }
@@ -32,17 +38,11 @@ export function FloatingActionButton({
 const styles = StyleSheet.create({
   fab: {
     alignItems: "center",
-    backgroundColor: "#2563eb",
     borderRadius: 28,
-    elevation: 6,
     height: 56,
     justifyContent: "center",
     position: "absolute",
     right: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
     width: 56,
   },
   fabPressed: {

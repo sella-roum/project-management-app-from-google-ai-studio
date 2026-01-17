@@ -8,7 +8,7 @@ export const evaluateAutomationCondition = (
   const parts = condition.split(" ");
   if (parts.length === 3) {
     const [field, op, value] = parts;
-    const actual = (issue as Record<string, unknown>)[field];
+    const actual = (issue as unknown as Record<string, unknown>)[field];
     if (op === "=") return String(actual) === value;
     if (op === "!=") return String(actual) !== value;
   }
