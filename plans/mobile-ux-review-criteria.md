@@ -25,5 +25,4 @@
 - [ ] Light/Darkで同等の可読性がある
 
 ## 付帯資料
-- Before/Afterスクリーンショット（`plans/assets/`）
 - Parity差分一覧（`plans/mobile-ux-parity-diff.md`）

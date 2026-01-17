@@ -33,6 +33,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
   const cardBackground = useThemeColor({}, "surfaceRaised");
   const subtleBorder = useThemeColor({}, "borderSubtle");
   const mutedText = useThemeColor({}, "textSecondary");
+  const textOnBrand = useThemeColor({}, "textOnBrand");
   const warningBg = useThemeColor({}, "stateWarningBg");
   const warningText = useThemeColor({}, "stateWarningText");
   const errorBg = useThemeColor({}, "stateErrorBg");
@@ -59,7 +60,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
           label={STATUS_LABELS[issue.status]}
           variant="solid"
           backgroundColor={STATUS_COLORS[issue.status] ?? "#94a3b8"}
-          textColor="#fff"
+          textColor={textOnBrand}
         />
       </ThemedView>
       <ThemedText numberOfLines={2} style={styles.issueTitle}>

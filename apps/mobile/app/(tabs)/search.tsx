@@ -59,6 +59,8 @@ export default function SearchScreen() {
   const metaTextColor = useThemeColor({}, "textSecondary");
   const activeText = useThemeColor({}, "stateInfoText");
   const inactiveText = useThemeColor({}, "textSecondary");
+  const errorBorder = useThemeColor({}, "stateErrorText");
+  const modalOverlayColor = useThemeColor({}, "surfaceOverlay");
 
   useEffect(() => {
     if (!ready) return;
@@ -70,7 +72,7 @@ export default function SearchScreen() {
       ]);
       setIssues(issueData);
       setSavedFilters(saved);
-      setProjects(projectData.map((project) => project));
+      setProjects(projectData);
     };
     void load();
   }, [ready]);
@@ -112,9 +114,11 @@ export default function SearchScreen() {
         return b.createdAt.localeCompare(a.createdAt);
       }
       if (sortKey === "priority") {
+        const aIndex = priorityOrder.indexOf(a.priority);
+        const bIndex = priorityOrder.indexOf(b.priority);
         return (
-          priorityOrder.indexOf(a.priority) -
-          priorityOrder.indexOf(b.priority)
+          (aIndex === -1 ? priorityOrder.length : aIndex) -
+          (bIndex === -1 ? priorityOrder.length : bIndex)
         );
       }
       return b.updatedAt.localeCompare(a.updatedAt);
@@ -194,6 +198,47 @@ export default function SearchScreen() {
     { key: "created", label: "作成日" },
     { key: "priority", label: "優先度" },
   ];
+
+  const SortRow = ({
+    sortKey: activeKey,
+    sortOptions: options,
+    onSortChange,
+  }: {
+    sortKey: "updated" | "created" | "priority";
+    sortOptions: { key: "updated" | "created" | "priority"; label: string }[];
+    onSortChange: (key: "updated" | "created" | "priority") => void;
+  }) => (
+    <ThemedView style={styles.sortRow}>
+      <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
+        並び替え
+      </ThemedText>
+      <ThemedView style={styles.sortOptions}>
+        {options.map((option) => {
+          const isActive = activeKey === option.key;
+          return (
+            <Pressable
+              key={option.key}
+              onPress={() => onSortChange(option.key)}
+              style={[
+                styles.sortChip,
+                { borderColor: borderSubtle },
+                isActive && { borderColor: activeBorder, backgroundColor: activeBg },
+              ]}
+            >
+              <View style={styles.chipContent}>
+                {isActive ? (
+                  <MaterialIcons name="check" size={16} color={activeText} />
+                ) : null}
+                <ThemedText type="caption" style={{ color: isActive ? activeText : inactiveText }}>
+                  {option.label}
+                </ThemedText>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ThemedView>
+    </ThemedView>
+  );
 
   const handleJqlChange = (value: string) => {
     setQuery(value);
@@ -367,36 +412,11 @@ export default function SearchScreen() {
               ))}
             </ThemedView>
           ) : null}
-          <ThemedView style={styles.sortRow}>
-            <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
-              並び替え
-            </ThemedText>
-            <ThemedView style={styles.sortOptions}>
-              {sortOptions.map((option) => {
-                const isActive = sortKey === option.key;
-                return (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => setSortKey(option.key)}
-                    style={[
-                      styles.sortChip,
-                      { borderColor: borderSubtle },
-                      isActive && { borderColor: activeBorder, backgroundColor: activeBg },
-                    ]}
-                  >
-                    <View style={styles.chipContent}>
-                      {isActive ? (
-                        <MaterialIcons name="check" size={16} color={activeText} />
-                      ) : null}
-                      <ThemedText type="caption" style={{ color: isActive ? activeText : inactiveText }}>
-                        {option.label}
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ThemedView>
-          </ThemedView>
+          <SortRow
+            sortKey={sortKey}
+            sortOptions={sortOptions}
+            onSortChange={setSortKey}
+          />
           <Button label="この検索を保存" onPress={() => setSaveModalOpen(true)} />
         </ThemedView>
       ) : (
@@ -477,7 +497,7 @@ export default function SearchScreen() {
                     color: activeFilter === "assigned" ? activeText : inactiveText,
                   }}
                 >
-                  Assigned
+                  担当中
                 </ThemedText>
               </View>
             </Pressable>
@@ -502,7 +522,7 @@ export default function SearchScreen() {
                     color: activeFilter === "reported" ? activeText : inactiveText,
                   }}
                 >
-                  Reported
+                  報告済み
                 </ThemedText>
               </View>
             </Pressable>
@@ -510,7 +530,7 @@ export default function SearchScreen() {
               onPress={() => setActiveFilter(null)}
               style={[styles.filterButton, { borderColor: borderSubtle }]}
             >
-              <ThemedText type="body">Clear</ThemedText>
+              <ThemedText type="body">クリア</ThemedText>
             </Pressable>
             <Pressable
               onPress={() => setSaveModalOpen(true)}
@@ -521,7 +541,7 @@ export default function SearchScreen() {
           </ThemedView>
           {showAdvanced ? (
             <ThemedView style={styles.section}>
-              <ThemedText type="headline">Project</ThemedText>
+              <ThemedText type="headline">プロジェクト</ThemedText>
               <Pressable
                 onPress={() => setFilterProjectId("")}
                 style={[
@@ -577,36 +597,11 @@ export default function SearchScreen() {
               ))}
             </ThemedView>
           ) : null}
-          <ThemedView style={styles.sortRow}>
-            <ThemedText type="caption" style={[styles.metaText, { color: metaTextColor }]}>
-              並び替え
-            </ThemedText>
-            <ThemedView style={styles.sortOptions}>
-              {sortOptions.map((option) => {
-                const isActive = sortKey === option.key;
-                return (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => setSortKey(option.key)}
-                    style={[
-                      styles.sortChip,
-                      { borderColor: borderSubtle },
-                      isActive && { borderColor: activeBorder, backgroundColor: activeBg },
-                    ]}
-                  >
-                    <View style={styles.chipContent}>
-                      {isActive ? (
-                        <MaterialIcons name="check" size={16} color={activeText} />
-                      ) : null}
-                      <ThemedText type="caption" style={{ color: isActive ? activeText : inactiveText }}>
-                        {option.label}
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ThemedView>
-          </ThemedView>
+          <SortRow
+            sortKey={sortKey}
+            sortOptions={sortOptions}
+            onSortChange={setSortKey}
+          />
         </ThemedView>
       )}
 
@@ -655,8 +650,7 @@ export default function SearchScreen() {
                     onPress={() => handleDeleteFilter(filter.id)}
                     style={[
                       styles.savedFilterAction,
-                      { borderColor: borderSubtle },
-                      styles.savedFilterDelete,
+                      { borderColor: errorBorder },
                     ]}
                   >
                     <ThemedText type="body">削除</ThemedText>
@@ -693,6 +687,7 @@ export default function SearchScreen() {
         onRequestClose={() => setSaveModalOpen(false)}
       >
         <ThemedView style={styles.modalOverlay}>
+          <View style={[styles.modalBackdrop, { backgroundColor: modalOverlayColor }]} />
           <ThemedView style={[styles.modalCard, { backgroundColor: surfaceRaised }]}>
             <ThemedText type="headline">保存済みフィルタ</ThemedText>
             <Input
@@ -768,8 +763,10 @@ const styles = StyleSheet.create({
     padding: Spacing.l,
     ...Elevation.medium,
   },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   modalOverlay: {
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -803,9 +800,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: Spacing.s,
     marginTop: Spacing.s,
-  },
-  savedFilterDelete: {
-    borderColor: "#fca5a5",
   },
   suggestions: {
     gap: Spacing.s,

@@ -86,7 +86,7 @@ export default function ModalScreen() {
       key: projectKey || projectName.substring(0, 3).toUpperCase(),
       type: projectType,
       category: projectCategory,
-      iconUrl: projectType === "Scrum" ? "??" : "??",
+      iconUrl: undefined,
       description,
       leadId: getCurrentUserId(),
     });

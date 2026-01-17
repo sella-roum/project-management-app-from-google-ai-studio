@@ -16,5 +16,5 @@
 - `apps/mobile/app/(tabs)/profile.tsx`
 - `apps/mobile/app/issue/[issueId].tsx`
 - `apps/mobile/app/project/[projectId]/index.tsx`
-- `packages/core`（label/status/priority/type等の共通定義）
+- `packages/core/src`（label/status/priority/type等の共通定義）
 - `packages/storage`（Dexie/SQLiteの保存・取得差分）

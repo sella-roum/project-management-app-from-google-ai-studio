@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Switch } from "react-native";
 import { useRouter } from "expo-router";
 
 import { getCurrentUser, getUserStats, reset, updateUser } from "@repo/storage";
@@ -298,28 +298,16 @@ export default function ProfileScreen() {
         <ThemedText type="headline" style={styles.cardTitle}>
           設定
         </ThemedText>
-        <Pressable
-          onPress={handleToggleNotifications}
-          disabled={isProcessing}
-          style={[styles.menuItem, { borderBottomColor: borderSubtle }]}
-        >
+        <ThemedView style={[styles.menuItem, { borderBottomColor: borderSubtle }]}>
           <ThemedText type="body">通知</ThemedText>
-          <ThemedView
-            style={[
-              styles.toggle,
-              { backgroundColor: toggleBg },
-              notificationsEnabled && { backgroundColor: toggleActiveBg },
-            ]}
-          >
-            <ThemedView
-              style={[
-                styles.toggleThumb,
-                { backgroundColor: textOnBrand },
-                notificationsEnabled && styles.toggleThumbActive,
-              ]}
-            />
-          </ThemedView>
-        </Pressable>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={handleToggleNotifications}
+            disabled={isProcessing}
+            trackColor={{ false: toggleBg, true: toggleActiveBg }}
+            thumbColor={textOnBrand}
+          />
+        </ThemedView>
         <Pressable
           onPress={() => router.push("/(tabs)/notifications")}
           style={[styles.menuItem, { borderBottomColor: borderSubtle }]}
@@ -363,19 +351,19 @@ export default function ProfileScreen() {
           <ThemedView style={styles.statsItem}>
             <ThemedText type="headline">{stats.assigned}</ThemedText>
             <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
-              Assigned
+              担当中
             </ThemedText>
           </ThemedView>
           <ThemedView style={styles.statsItem}>
             <ThemedText type="headline">{stats.reported}</ThemedText>
             <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
-              Reported
+              報告済み
             </ThemedText>
           </ThemedView>
           <ThemedView style={styles.statsItem}>
             <ThemedText type="headline">{stats.leading}</ThemedText>
             <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
-              Leading
+              リード中
             </ThemedText>
           </ThemedView>
         </ThemedView>
@@ -489,21 +477,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Spacing.l,
     paddingBottom: Spacing.l,
-  },
-  toggle: {
-    borderRadius: 999,
-    height: 24,
-    justifyContent: "center",
-    width: 44,
-  },
-  toggleThumb: {
-    borderRadius: 10,
-    height: 20,
-    marginLeft: 2,
-    width: 20,
-  },
-  toggleThumbActive: {
-    marginLeft: 22,
   },
   warningBox: {
     borderRadius: Radius.m,

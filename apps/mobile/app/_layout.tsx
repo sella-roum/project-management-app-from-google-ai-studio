@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { Modal, Platform, StyleSheet, UIManager, View } from "react-native";
 
 import { SetupWizard } from "@/components/setup-wizard";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const modalBackdropColor = useThemeColor({}, "stateInfoBg");
 
   useEffect(() => {
     let active = true;
@@ -71,7 +73,7 @@ export default function RootLayout() {
         animationType="fade"
         onRequestClose={() => {}}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { backgroundColor: modalBackdropColor }]}>
           <SetupWizard onComplete={handleSetupComplete} />
         </View>
       </Modal>
@@ -85,6 +87,5 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "#1e3a8a",
   },
 });

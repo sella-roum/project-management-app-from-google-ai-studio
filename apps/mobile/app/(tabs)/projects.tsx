@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRouter } from "expo-router";
 import { LayoutAnimation, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
@@ -29,6 +29,39 @@ type ProjectSummary = {
   nextDueDate?: string;
 };
 
+const buildIssueStats = (issueData: Issue[]) =>
+  issueData.reduce<Record<string, { totalIssues: number; doneIssues: number; nextDueDate?: string }>>(
+    (acc, issue) => {
+      const current = acc[issue.projectId] ?? {
+        totalIssues: 0,
+        doneIssues: 0,
+      };
+      const totalIssues = current.totalIssues + 1;
+      const doneIssues =
+        current.doneIssues + (issue.status === "Done" ? 1 : 0);
+      let nextDueDate = current.nextDueDate;
+      if (issue.status !== "Done" && issue.dueDate) {
+        if (!nextDueDate) {
+          nextDueDate = issue.dueDate;
+        } else if (
+          new Date(issue.dueDate).getTime() <
+          new Date(nextDueDate).getTime()
+        ) {
+          nextDueDate = issue.dueDate;
+        }
+      }
+      return {
+        ...acc,
+        [issue.projectId]: {
+          totalIssues,
+          doneIssues,
+          nextDueDate,
+        },
+      };
+    },
+    {},
+  );
+
 export default function ProjectsScreen() {
   const router = useRouter();
   const ready = useStorageReady();
@@ -49,76 +82,7 @@ export default function ProjectsScreen() {
   const dueAlertText = useThemeColor({}, "stateErrorText");
   const dueAlertBackground = useThemeColor({}, "stateErrorBg");
 
-  const buildIssueStats = (issueData: Issue[]) =>
-    issueData.reduce<Record<string, { totalIssues: number; doneIssues: number; nextDueDate?: string }>>(
-      (acc, issue) => {
-        const current = acc[issue.projectId] ?? {
-          totalIssues: 0,
-          doneIssues: 0,
-        };
-        const totalIssues = current.totalIssues + 1;
-        const doneIssues =
-          current.doneIssues + (issue.status === "Done" ? 1 : 0);
-        let nextDueDate = current.nextDueDate;
-        if (issue.dueDate) {
-          if (!nextDueDate) {
-            nextDueDate = issue.dueDate;
-          } else if (
-            new Date(issue.dueDate).getTime() <
-            new Date(nextDueDate).getTime()
-          ) {
-            nextDueDate = issue.dueDate;
-          }
-        }
-        return {
-          ...acc,
-          [issue.projectId]: {
-            totalIssues,
-            doneIssues,
-            nextDueDate,
-          },
-        };
-      },
-      {},
-    );
-
-  useEffect(() => {
-    if (!ready) return;
-    const load = async () => {
-      const [data, issueData] = await Promise.all([getProjects(), getIssues()]);
-      const issueStats = buildIssueStats(issueData);
-      setProjects(
-        data.map((project) => ({
-          id: project.id,
-          key: project.key,
-          name: project.name,
-          type: project.type,
-          category: project.category,
-          description: project.description,
-          iconUrl: project.iconUrl,
-          starred: project.starred,
-          totalIssues: issueStats[project.id]?.totalIssues ?? 0,
-          doneIssues: issueStats[project.id]?.doneIssues ?? 0,
-          nextDueDate: issueStats[project.id]?.nextDueDate,
-        })),
-      );
-    };
-    void load();
-  }, [ready]);
-
-  useEffect(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-  }, [projects.length]);
-
-  const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) => {
-      if (a.starred === b.starred) return a.name.localeCompare(b.name);
-      return a.starred ? -1 : 1;
-    });
-  }, [projects]);
-
-  const handleToggleStar = async (projectId: string) => {
-    await toggleProjectStar(projectId);
+  const loadProjects = useCallback(async () => {
     const [data, issueData] = await Promise.all([getProjects(), getIssues()]);
     const issueStats = buildIssueStats(issueData);
     setProjects(
@@ -136,6 +100,33 @@ export default function ProjectsScreen() {
         nextDueDate: issueStats[project.id]?.nextDueDate,
       })),
     );
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    void loadProjects();
+  }, [ready, loadProjects]);
+
+  const hasLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      return;
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [projects.length]);
+
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      if (a.starred === b.starred) return a.name.localeCompare(b.name);
+      return a.starred ? -1 : 1;
+    });
+  }, [projects]);
+
+  const handleToggleStar = async (projectId: string) => {
+    await toggleProjectStar(projectId);
+    await loadProjects();
   };
 
   const handleOpenProject = (projectId: string) => {
@@ -143,7 +134,7 @@ export default function ProjectsScreen() {
   };
 
   const formatDueDate = (date?: string) =>
-    date ? new Date(date).toLocaleDateString() : "期限なし";
+    date ? new Date(date).toLocaleDateString("ja-JP") : "期限なし";
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -220,8 +211,7 @@ export default function ProjectsScreen() {
                       </ThemedView>
                     </ThemedView>
                     <Pressable
-                      onPress={(event) => {
-                        event.stopPropagation();
+                      onPress={() => {
                         void handleToggleStar(project.id);
                       }}
                       style={styles.starButton}

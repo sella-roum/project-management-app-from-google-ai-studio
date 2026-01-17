@@ -1,12 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 
 import { setupInitialProject } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Elevation, Radius, Spacing } from "@/constants/theme";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
@@ -23,8 +24,6 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const borderSubtle = useThemeColor({}, "borderSubtle");
   const activeBorder = useThemeColor({}, "brandPrimary");
   const activeBackground = useThemeColor({}, "stateInfoBg");
-  const inputTextColor = useThemeColor({}, "textPrimary");
-  const inputPlaceholderColor = useThemeColor({}, "textTertiary");
   const surfaceRaised = useThemeColor({}, "surfaceRaised");
   const progressText = useThemeColor({}, "textSecondary");
   const progressFill = useThemeColor({}, "brandPrimary");
@@ -76,20 +75,19 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           <ThemedText type="body">
             まずは最初のチームプロジェクトを作成しましょう。
           </ThemedText>
-          <TextInput
-            style={[styles.input, { borderColor: borderSubtle, color: inputTextColor }]}
+          <Input
+            label="プロジェクト名"
             placeholder="プロジェクト名 (例: 開発チーム)"
             value={name}
             onChangeText={setName}
-            placeholderTextColor={inputPlaceholderColor}
           />
-          <TextInput
-            style={[styles.input, { borderColor: borderSubtle, color: inputTextColor }]}
+          <Input
+            label="キー"
             placeholder="キー (例: DEV)"
             value={key}
             onChangeText={(value) => setKey(value.toUpperCase())}
             maxLength={5}
-            placeholderTextColor={inputPlaceholderColor}
+            autoCapitalize="characters"
           />
           <Button label="次へ" onPress={() => setStep(2)} disabled={!name} />
         </ThemedView>
@@ -132,9 +130,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           <ThemedView style={styles.actions}>
             <Button label="戻る" onPress={() => setStep(1)} variant="secondary" />
             <Button
-              label={loading ? "作成中..." : "開始する"}
+              label="開始する"
               onPress={handleFinish}
-              disabled={loading || !name}
+              disabled={!name}
+              loading={loading}
             />
           </ThemedView>
         </ThemedView>
@@ -164,12 +163,6 @@ const styles = StyleSheet.create({
     gap: Spacing.l,
     justifyContent: "center",
     paddingHorizontal: Spacing.xl,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Radius.m,
-    paddingHorizontal: Spacing.m,
-    paddingVertical: Spacing.s,
   },
   option: {
     borderWidth: 1,

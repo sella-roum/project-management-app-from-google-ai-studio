@@ -28,7 +28,7 @@ export function Button({
   const backgroundSecondary = useThemeColor({}, "surfaceRaised");
   const borderSubtle = useThemeColor({}, "borderSubtle");
   const textPrimary = useThemeColor({}, "textPrimary");
-  const textOnPrimary = useThemeColor({}, "surfaceRaised");
+  const textOnPrimary = useThemeColor({}, "textOnBrand");
 
   const isDisabled = disabled || loading;
 

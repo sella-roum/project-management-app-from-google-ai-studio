@@ -24,6 +24,7 @@ export function Chip({
   style,
 }: ChipProps) {
   const defaultBorder = useThemeColor({}, "borderSubtle");
+  const defaultSolidBg = useThemeColor({}, "surfaceRaised");
   const defaultText = useThemeColor({}, "textSecondary");
 
   return (
@@ -32,7 +33,7 @@ export function Chip({
         styles.base,
         {
           backgroundColor:
-            variant === "solid" ? backgroundColor ?? defaultBorder : "transparent",
+            variant === "solid" ? backgroundColor ?? defaultSolidBg : "transparent",
           borderColor: borderColor ?? defaultBorder,
         },
         style,

@@ -19,43 +19,47 @@ export default function WelcomeScreen() {
   const borderSubtle = useThemeColor({}, "borderSubtle");
   const metaTextColor = useThemeColor({}, "textSecondary");
 
-  const handleDemoMode = async () => {
+  const runWithLoading = async (
+    action: () => Promise<void>,
+    logLabel: string,
+    alertMessage: string,
+  ) => {
     setLoading(true);
     try {
-      await seedDatabase();
-      await AsyncStorage.multiSet([
-        ["appInitialized", "true"],
-        ["hasSetup", "true"],
-      ]);
-      router.replace("/(auth)/login");
+      await action();
     } catch (error) {
-      console.error("Failed to start demo mode", error);
-      Alert.alert(
-        "初期化エラー",
-        "デモデータの準備に失敗しました。もう一度お試しください。",
-      );
+      console.error(logLabel, error);
+      Alert.alert("初期化エラー", alertMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFreshStart = async () => {
-    setLoading(true);
-    try {
-      await clearDatabase();
-      await AsyncStorage.setItem("appInitialized", "true");
-      await AsyncStorage.removeItem("hasSetup");
-      router.replace("/(auth)/login");
-    } catch (error) {
-      console.error("Failed to start fresh", error);
-      Alert.alert(
-        "初期化エラー",
-        "初期化に失敗しました。もう一度お試しください。",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleDemoMode = () =>
+    runWithLoading(
+      async () => {
+        await seedDatabase();
+        await AsyncStorage.multiSet([
+          ["appInitialized", "true"],
+          ["hasSetup", "true"],
+        ]);
+        router.replace("/(auth)/login");
+      },
+      "Failed to start demo mode",
+      "デモデータの準備に失敗しました。もう一度お試しください。",
+    );
+
+  const handleFreshStart = () =>
+    runWithLoading(
+      async () => {
+        await clearDatabase();
+        await AsyncStorage.setItem("appInitialized", "true");
+        await AsyncStorage.removeItem("hasSetup");
+        router.replace("/(auth)/login");
+      },
+      "Failed to start fresh",
+      "初期化に失敗しました。もう一度お試しください。",
+    );
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surfaceBase }]}>
