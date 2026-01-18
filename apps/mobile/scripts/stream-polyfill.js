@@ -2,7 +2,7 @@ const {
   ReadableStream,
   WritableStream,
   TransformStream,
-} = require("web-streams-polyfill/ponyfill/es2018");
+} = require("web-streams-polyfill/ponyfill");
 
 if (typeof global.ReadableStream === "undefined") {
   global.ReadableStream = ReadableStream;
