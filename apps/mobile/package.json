@@ -3,11 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start",
+    "start": "NODE_OPTIONS=\"--require ./scripts/stream-polyfill.js\" expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start --android",
-    "ios": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start --ios",
-    "web": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start --web",
+    "android": "NODE_OPTIONS=\"--require ./scripts/stream-polyfill.js\" expo start --android",
+    "ios": "NODE_OPTIONS=\"--require ./scripts/stream-polyfill.js\" expo start --ios",
+    "web": "NODE_OPTIONS=\"--require ./scripts/stream-polyfill.js\" expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
