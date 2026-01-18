@@ -1,20 +1,33 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, TextInput } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Switch } from "react-native";
 import { useRouter } from "expo-router";
 
 import { getCurrentUser, getUserStats, reset, updateUser } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Elevation, Radius, Spacing } from "@/constants/theme";
 import { useStorageReady } from "@/hooks/use-storage";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function ProfileScreen() {
   const ready = useStorageReady();
   const router = useRouter();
-  const inputTextColor = useThemeColor({}, "text");
-  const inputPlaceholderColor = useThemeColor({}, "icon");
+  const borderSubtle = useThemeColor({}, "borderSubtle");
+  const surfaceRaised = useThemeColor({}, "surfaceRaised");
+  const avatarBg = useThemeColor({}, "brandPrimary");
+  const menuMetaColor = useThemeColor({}, "textSecondary");
+  const dangerColor = useThemeColor({}, "stateErrorText");
+  const dangerBackground = useThemeColor({}, "stateErrorBg");
+  const warningBorder = useThemeColor({}, "stateWarningText");
+  const warningBackground = useThemeColor({}, "stateWarningBg");
+  const toggleBg = useThemeColor({}, "borderSubtle");
+  const toggleActiveBg = useThemeColor({}, "brandPrimary");
+  const textOnBrand = useThemeColor({}, "textOnBrand");
+  const cardShadow = Elevation.low;
   const [isEditing, setIsEditing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [name, setName] = useState("");
@@ -200,140 +213,187 @@ export default function ProfileScreen() {
       <ThemedView style={styles.headerRow}>
         <ThemedText type="title">Profile</ThemedText>
         {!isEditing ? (
-          <Pressable
+          <Button
+            label="編集"
             onPress={() => setIsEditing(true)}
             disabled={isProcessing}
-            style={styles.secondaryButton}
-          >
-            <ThemedText>編集</ThemedText>
-          </Pressable>
+            variant="secondary"
+          />
         ) : (
           <ThemedView style={styles.headerRow}>
-            <Pressable
+            <Button
+              label="キャンセル"
               onPress={() => setIsEditing(false)}
               disabled={isProcessing}
-              style={styles.ghostButton}
-            >
-              <ThemedText>キャンセル</ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={handleSave}
-              disabled={isProcessing}
-              style={styles.primaryButton}
-            >
-              <ThemedText type="link">保存</ThemedText>
-            </Pressable>
+              variant="ghost"
+            />
+            <Button label="保存" onPress={handleSave} disabled={isProcessing} />
           </ThemedView>
         )}
       </ThemedView>
 
-      <ThemedView style={styles.profileCard}>
-        <ThemedView style={styles.avatar}>
-          {avatarUrl && !imageError ? (
-            <Image
-              source={{ uri: avatarUrl }}
-              style={styles.avatarImage}
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <ThemedText style={styles.avatarText}>
-              {name ? name.charAt(0) : "U"}
+      <ThemedView
+        style={[
+          styles.profileCard,
+          { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+          cardShadow,
+        ]}
+      >
+        <ThemedView style={styles.profileHeader}>
+          <ThemedView style={[styles.avatar, { backgroundColor: avatarBg }]}>
+            {avatarUrl && !imageError ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.avatarImage}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <ThemedText style={[styles.avatarText, { color: textOnBrand }]}>
+                {name ? name.charAt(0) : "U"}
+              </ThemedText>
+            )}
+          </ThemedView>
+          <ThemedView style={styles.profileCopy}>
+            <ThemedText type="headline">{name || "User"}</ThemedText>
+            <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
+              プロダクトメンバー
             </ThemedText>
-          )}
+            <ThemedText type="body">{email || "user@example.com"}</ThemedText>
+          </ThemedView>
         </ThemedView>
         {isEditing ? (
           <ThemedView style={styles.section}>
-            <TextInput
-              style={[styles.input, { color: inputTextColor }]}
+            <Input
+              label="Name"
               placeholder="Name"
               value={name}
               onChangeText={setName}
-              placeholderTextColor={inputPlaceholderColor}
             />
-            <TextInput
-              style={[styles.input, { color: inputTextColor }]}
+            <Input
+              label="Email"
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
-              placeholderTextColor={inputPlaceholderColor}
+              keyboardType="email-address"
             />
-            <TextInput
-              style={[styles.input, { color: inputTextColor }]}
+            <Input
+              label="Avatar URL"
               placeholder="Avatar URL"
               value={avatarUrl}
               onChangeText={setAvatarUrl}
               autoCapitalize="none"
-              placeholderTextColor={inputPlaceholderColor}
             />
           </ThemedView>
-        ) : (
-          <ThemedView style={styles.section}>
-            <ThemedText type="defaultSemiBold">{name}</ThemedText>
-            <ThemedText>{email || "user@example.com"}</ThemedText>
-          </ThemedView>
-        )}
+        ) : null}
       </ThemedView>
 
-      <ThemedView style={styles.menuCard}>
-        <Pressable
-          onPress={handleToggleNotifications}
-          disabled={isProcessing}
-          style={styles.menuItem}
-        >
-          <ThemedText>通知</ThemedText>
-          <ThemedView
-            style={[
-              styles.toggle,
-              notificationsEnabled && styles.toggleActive,
-            ]}
-          >
-            <ThemedView
-              style={[
-                styles.toggleThumb,
-                notificationsEnabled && styles.toggleThumbActive,
-              ]}
-            />
-          </ThemedView>
-        </Pressable>
+      <ThemedView
+        style={[
+          styles.menuCard,
+          { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+          cardShadow,
+        ]}
+      >
+        <ThemedText type="headline" style={styles.cardTitle}>
+          設定
+        </ThemedText>
+        <ThemedView style={[styles.menuItem, { borderBottomColor: borderSubtle }]}>
+          <ThemedText type="body">通知</ThemedText>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={handleToggleNotifications}
+            disabled={isProcessing}
+            trackColor={{ false: toggleBg, true: toggleActiveBg }}
+            thumbColor={textOnBrand}
+          />
+        </ThemedView>
         <Pressable
           onPress={() => router.push("/(tabs)/notifications")}
-          style={styles.menuItem}
+          style={[styles.menuItem, { borderBottomColor: borderSubtle }]}
         >
-          <ThemedText>通知一覧</ThemedText>
+          <ThemedText type="body">通知一覧</ThemedText>
         </Pressable>
-        <Pressable onPress={handleLanguage} style={styles.menuItem}>
-          <ThemedText>言語</ThemedText>
-          <ThemedText style={styles.menuMeta}>日本語</ThemedText>
+        <Pressable onPress={handleLanguage} style={[styles.menuItem, { borderBottomColor: borderSubtle }]}>
+          <ThemedText type="body">言語</ThemedText>
+          <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
+            日本語
+          </ThemedText>
         </Pressable>
-        <Pressable onPress={() => router.push("/(tabs)/help")} style={styles.menuItem}>
-          <ThemedText>ヘルプ</ThemedText>
+        <Pressable
+          onPress={() => router.push("/(tabs)/help")}
+          style={[styles.menuItem, { borderBottomColor: borderSubtle }]}
+        >
+          <ThemedText type="body">ヘルプ</ThemedText>
         </Pressable>
         <Pressable
           onPress={handleLogout}
           disabled={isProcessing}
-          style={styles.menuItem}
+          style={[styles.menuItem, { borderBottomColor: "transparent" }]}
         >
-          <ThemedText style={styles.dangerText}>ログアウト</ThemedText>
+          <ThemedText style={[styles.dangerText, { color: dangerColor }]} type="body">
+            ログアウト
+          </ThemedText>
         </Pressable>
       </ThemedView>
 
-      <ThemedView style={styles.section}>
-        <ThemedText type="subtitle">Stats</ThemedText>
-        <ThemedText>Assigned issues: {stats.assigned}</ThemedText>
-        <ThemedText>Reported issues: {stats.reported}</ThemedText>
-        <ThemedText>Leading projects: {stats.leading}</ThemedText>
+      <ThemedView
+        style={[
+          styles.menuCard,
+          { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+          cardShadow,
+        ]}
+      >
+        <ThemedText type="headline" style={styles.cardTitle}>
+          Stats
+        </ThemedText>
+        <ThemedView style={styles.statsRow}>
+          <ThemedView style={styles.statsItem}>
+            <ThemedText type="headline">{stats.assigned}</ThemedText>
+            <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
+              担当中
+            </ThemedText>
+          </ThemedView>
+          <ThemedView style={styles.statsItem}>
+            <ThemedText type="headline">{stats.reported}</ThemedText>
+            <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
+              報告済み
+            </ThemedText>
+          </ThemedView>
+          <ThemedView style={styles.statsItem}>
+            <ThemedText type="headline">{stats.leading}</ThemedText>
+            <ThemedText type="caption" style={[styles.menuMeta, { color: menuMetaColor }]}>
+              リード中
+            </ThemedText>
+          </ThemedView>
+        </ThemedView>
       </ThemedView>
 
-      <Pressable
-        onPress={handleReset}
-        style={styles.dangerButton}
-        disabled={isProcessing}
+      <ThemedView
+        style={[
+          styles.menuCard,
+          { backgroundColor: surfaceRaised, borderColor: warningBorder },
+          cardShadow,
+        ]}
       >
-        <ThemedText type="link">
-          {isProcessing ? "処理中..." : "アプリを初期化する"}
+        <ThemedText type="headline" style={styles.cardTitle}>
+          危険な操作
         </ThemedText>
-      </Pressable>
+        <ThemedView style={[styles.warningBox, { backgroundColor: warningBackground }]}>
+          <ThemedText type="caption" style={{ color: dangerColor }}>
+            リセットすると全てのプロジェクトと課題が削除されます。
+          </ThemedText>
+        </ThemedView>
+        <Pressable
+          onPress={handleReset}
+          style={[styles.dangerButton, { backgroundColor: dangerBackground }]}
+          disabled={isProcessing}
+        >
+          <ThemedText type="bodySemiBold" style={{ color: dangerColor }}>
+            {isProcessing ? "処理中..." : "アプリを初期化する"}
+          </ThemedText>
+        </Pressable>
+      </ThemedView>
     </ThemedView>
   );
 }
@@ -341,14 +401,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   avatar: {
     alignItems: "center",
-    backgroundColor: "#2563eb",
     borderRadius: 40,
     height: 80,
     justifyContent: "center",
     width: 80,
   },
   avatarText: {
-    color: "#fff",
     fontSize: 28,
     fontWeight: "700",
   },
@@ -359,96 +417,70 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    gap: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    gap: Spacing.m,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.xl,
   },
   dangerButton: {
     alignItems: "center",
-    backgroundColor: "#dc2626",
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: Radius.m,
+    paddingVertical: Spacing.m,
   },
-  dangerText: {
-    color: "#dc2626",
-  },
-  ghostButton: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
+  dangerText: {},
   headerRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  input: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  cardTitle: {
+    paddingHorizontal: Spacing.l,
+    paddingTop: Spacing.l,
   },
   menuCard: {
-    borderRadius: 16,
+    borderRadius: Radius.l,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    gap: Spacing.s,
+    paddingBottom: Spacing.s,
   },
   menuItem: {
-    borderBottomColor: "#e5e7eb",
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: Spacing.l,
+    paddingVertical: Spacing.m,
   },
-  menuMeta: {
-    color: "#6b7280",
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
+  menuMeta: {},
   profileCard: {
-    alignItems: "center",
-    borderRadius: 16,
+    borderRadius: Radius.l,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 12,
-    padding: 16,
+    gap: Spacing.m,
+    padding: Spacing.l,
   },
-  secondaryButton: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  profileCopy: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  profileHeader: {
+    flexDirection: "row",
+    gap: Spacing.m,
   },
   section: {
-    gap: 8,
+    gap: Spacing.s,
   },
-  toggle: {
-    backgroundColor: "#e5e7eb",
-    borderRadius: 999,
-    height: 24,
-    justifyContent: "center",
-    width: 44,
+  statsItem: {
+    alignItems: "center",
+    flex: 1,
+    gap: Spacing.xs,
   },
-  toggleActive: {
-    backgroundColor: "#2563eb",
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.l,
+    paddingBottom: Spacing.l,
   },
-  toggleThumb: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    height: 20,
-    marginLeft: 2,
-    width: 20,
-  },
-  toggleThumbActive: {
-    marginLeft: 22,
+  warningBox: {
+    borderRadius: Radius.m,
+    marginHorizontal: Spacing.l,
+    padding: Spacing.m,
   },
 });

@@ -16,7 +16,10 @@ import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/skeleton";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/button";
+import { Spacing } from "@/constants/theme";
 import { useStorageReady } from "@/hooks/use-storage";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function HomeScreen() {
   const ready = useStorageReady();
@@ -26,6 +29,12 @@ export default function HomeScreen() {
   const [recentIssues, setRecentIssues] = useState<Issue[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
+  const secondaryText = useThemeColor({}, "textSecondary");
+  const accentText = useThemeColor({}, "brandPrimary");
+  const onlineColor = useThemeColor({}, "stateSuccessBg");
+  const offlineColor = useThemeColor({}, "borderSubtle");
+  const surfaceRaised = useThemeColor({}, "surfaceRaised");
+  const borderSubtle = useThemeColor({}, "borderSubtle");
 
   useEffect(() => {
     if (!ready) return;
@@ -61,41 +70,97 @@ export default function HomeScreen() {
           <ThemedText type="title">
             {user ? `こんにちは、${user.name.split(" ")[0]}さん` : "Home"}
           </ThemedText>
-          <ThemedText style={styles.subtitle}>
+          <ThemedText style={[styles.subtitle, { color: secondaryText }]} type="body">
             今日のやるべきことはこちらです。
           </ThemedText>
         </ThemedView>
         <ThemedView
           style={[
             styles.onlineDot,
-            { backgroundColor: isOnline ? "#22c55e" : "#d1d5db" },
+            { backgroundColor: isOnline ? onlineColor : offlineColor },
           ]}
+        />
+      </ThemedView>
+
+      <ThemedView
+        style={[
+          styles.heroCard,
+          { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+        ]}
+      >
+        <ThemedView style={styles.heroRow}>
+          <ThemedView style={styles.heroText}>
+            <ThemedText type="headline">今日の目的</ThemedText>
+            <ThemedText type="body" style={[styles.subtitle, { color: secondaryText }]}>
+              重要課題の整理と、未読通知の確認を進めましょう。
+            </ThemedText>
+          </ThemedView>
+          <ThemedView style={styles.heroMeta}>
+            <ThemedText type="caption" style={[styles.subtitle, { color: secondaryText }]}>
+              未読通知
+            </ThemedText>
+            <ThemedText type="headline" style={{ color: accentText }}>
+              {unreadCount}
+            </ThemedText>
+          </ThemedView>
+        </ThemedView>
+        <Button
+          label="課題を作成"
+          onPress={() => router.push({ pathname: "/modal", params: { mode: "issue" } })}
+          variant="primary"
         />
       </ThemedView>
 
       {!ready ? (
         <ThemedView style={styles.statsRow}>
-          <ThemedView style={styles.statCard}>
+          <ThemedView
+            style={[
+              styles.statCard,
+              { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+            ]}
+          >
             <Skeleton width={48} />
             <Skeleton width={80} />
           </ThemedView>
-          <ThemedView style={styles.statCard}>
+          <ThemedView
+            style={[
+              styles.statCard,
+              { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+            ]}
+          >
             <Skeleton width={48} />
             <Skeleton width={80} />
           </ThemedView>
-          <ThemedView style={styles.statCard}>
+          <ThemedView
+            style={[
+              styles.statCard,
+              { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+            ]}
+          >
             <Skeleton width={48} />
             <Skeleton width={80} />
           </ThemedView>
         </ThemedView>
       ) : (
         <ThemedView style={styles.statsRow}>
-          <ThemedView style={styles.statCard}>
-            <ThemedText type="defaultSemiBold">{myIssues.length}</ThemedText>
-            <ThemedText style={styles.statLabel}>自分の課題</ThemedText>
+          <ThemedView
+            style={[
+              styles.statCard,
+              { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+            ]}
+          >
+            <ThemedText type="bodySemiBold">{myIssues.length}</ThemedText>
+            <ThemedText style={styles.statLabel} type="caption">
+              自分の課題
+            </ThemedText>
           </ThemedView>
-          <ThemedView style={styles.statCard}>
-            <ThemedText type="defaultSemiBold">
+          <ThemedView
+            style={[
+              styles.statCard,
+              { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+            ]}
+          >
+            <ThemedText type="bodySemiBold">
               {
                 myIssues.filter(
                   (issue) =>
@@ -103,18 +168,29 @@ export default function HomeScreen() {
                 ).length
               }
             </ThemedText>
-            <ThemedText style={styles.statLabel}>高優先度</ThemedText>
+            <ThemedText style={styles.statLabel} type="caption">
+              高優先度
+            </ThemedText>
           </ThemedView>
-          <ThemedView style={styles.statCard}>
-            <ThemedText type="defaultSemiBold">{unreadCount}</ThemedText>
-            <ThemedText style={styles.statLabel}>未読通知</ThemedText>
+          <ThemedView
+            style={[
+              styles.statCard,
+              { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+            ]}
+          >
+            <ThemedText type="bodySemiBold" style={{ color: accentText }}>
+              {unreadCount}
+            </ThemedText>
+            <ThemedText style={styles.statLabel} type="caption">
+              未読通知
+            </ThemedText>
           </ThemedView>
         </ThemedView>
       )}
 
       {recentIssues.length > 0 ? (
         <ThemedView style={styles.section}>
-          <ThemedText type="subtitle">最近見た項目</ThemedText>
+          <ThemedText type="headline">最近見た項目</ThemedText>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <ThemedView style={styles.horizontalRow}>
               {recentIssues.map((issue) => (
@@ -123,8 +199,10 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/issue/${issue.id}`)}
                 >
                   <ThemedView style={styles.recentCard}>
-                    <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
-                    <ThemedText numberOfLines={2}>{issue.title}</ThemedText>
+                    <ThemedText type="caption">{issue.key}</ThemedText>
+                    <ThemedText numberOfLines={2} type="bodySemiBold">
+                      {issue.title}
+                    </ThemedText>
                   </ThemedView>
                 </Pressable>
               ))}
@@ -135,7 +213,7 @@ export default function HomeScreen() {
 
       <ThemedView style={styles.section}>
         <ThemedView style={styles.rowBetween}>
-          <ThemedText type="subtitle">あなたの作業</ThemedText>
+          <ThemedText type="headline">あなたの作業</ThemedText>
           <Pressable onPress={() => router.push("/(tabs)/search")}>
             <ThemedText type="link">すべて</ThemedText>
           </Pressable>
@@ -152,21 +230,19 @@ export default function HomeScreen() {
         ) : (
           myIssues.slice(0, 10).map((issue) => (
             <ThemedView key={issue.id} style={styles.card}>
-              <ThemedText type="defaultSemiBold">{issue.key}</ThemedText>
-              <ThemedText>{issue.title}</ThemedText>
+              <ThemedText type="caption">{issue.key}</ThemedText>
+              <ThemedText type="bodySemiBold">{issue.title}</ThemedText>
               <ThemedView style={styles.rowWrap}>
-                <Pressable
+                <Button
+                  label="進行中"
                   onPress={() => handleStatusChange(issue.id, "In Progress")}
-                  style={styles.secondaryButton}
-                >
-                  <ThemedText>進行中</ThemedText>
-                </Pressable>
-                <Pressable
+                  variant="secondary"
+                />
+                <Button
+                  label="完了"
                   onPress={() => handleStatusChange(issue.id, "Done")}
-                  style={styles.primaryButton}
-                >
-                  <ThemedText type="link">完了</ThemedText>
-                </Pressable>
+                  variant="primary"
+                />
               </ThemedView>
             </ThemedView>
           ))
@@ -191,14 +267,32 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
-    gap: 6,
-    padding: 16,
+    gap: Spacing.s,
+    padding: Spacing.l,
   },
   container: {
     flex: 1,
-    gap: 16,
-    paddingHorizontal: 24,
+    gap: Spacing.l,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: 24,
+  },
+  heroCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: Spacing.m,
+    padding: Spacing.l,
+  },
+  heroMeta: {
+    alignItems: "flex-end",
+  },
+  heroRow: {
+    flexDirection: "row",
+    gap: Spacing.m,
+    justifyContent: "space-between",
+  },
+  heroText: {
+    flex: 1,
+    gap: Spacing.xs,
   },
   headerRow: {
     alignItems: "center",
@@ -207,26 +301,18 @@ const styles = StyleSheet.create({
   },
   horizontalRow: {
     flexDirection: "row",
-    gap: 12,
-    paddingVertical: 8,
+    gap: Spacing.m,
+    paddingVertical: Spacing.s,
   },
   onlineDot: {
     borderRadius: 6,
     height: 12,
     width: 12,
   },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
   recentCard: {
     borderRadius: 16,
-    gap: 6,
-    padding: 16,
+    gap: Spacing.s,
+    padding: Spacing.l,
     width: 200,
   },
   rowBetween: {
@@ -237,24 +323,18 @@ const styles = StyleSheet.create({
   rowWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-  },
-  secondaryButton: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    gap: Spacing.s,
   },
   section: {
-    gap: 12,
+    gap: Spacing.m,
   },
   statCard: {
     borderRadius: 16,
+    borderWidth: 1,
     flex: 1,
-    gap: 4,
-    padding: 16,
+    gap: Spacing.xs,
+    minHeight: 92,
+    padding: Spacing.l,
   },
   statLabel: {
     fontSize: 12,
@@ -263,7 +343,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  subtitle: {
-    color: "#6b7280",
-  },
+  subtitle: {},
 });

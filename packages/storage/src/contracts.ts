@@ -19,7 +19,7 @@ export interface Watchable<T> {
 export interface ProjectsRepo extends Watchable<Project> {
   list(): Promise<Project[]>;
   get(id: ID): Promise<Project | null>;
-  create(input: Omit<Project, "id"> & { id?: ID }): Promise<Project>;
+  create(input: Partial<Project> & { id?: ID }): Promise<Project>;
   update(id: ID, patch: Partial<Project>): Promise<Project>;
   toggleStar(id: ID): Promise<void>;
   remove(id: ID): Promise<void>;

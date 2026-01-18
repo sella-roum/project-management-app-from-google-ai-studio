@@ -18,6 +18,7 @@ export const getCurrentUserId = () => storage.getCurrentUserId();
 export const loginAsUser = (email: string) => storage.loginAsUser(email);
 export const registerUser = (email: string, name: string) =>
   storage.registerUser(email, name);
+export const getUsers = () => storage.getUsers();
 export const getUserById = (id: string) => storage.getUserById(id);
 export const getCurrentUser = () => storage.getCurrentUser();
 export const updateUser = (
