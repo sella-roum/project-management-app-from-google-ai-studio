@@ -3,11 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
+    "start": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
+    "android": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start --android",
+    "ios": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start --ios",
+    "web": "NODE_OPTIONS=--require ./scripts/stream-polyfill.js expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -39,7 +39,8 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "web-streams-polyfill": "^3.3.3"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
