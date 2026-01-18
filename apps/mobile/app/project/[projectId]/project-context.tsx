@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 
 import type { Issue, Project, ProjectStats, Sprint, Version } from "@repo/core";
-import { getIssues, getProjectById, getProjectStats, getSprints, getVersions } from "@repo/storage";
+import { buildProjectStats } from "@repo/core";
+import { getIssues, getProjectById, getSprints, getUsers, getVersions } from "@repo/storage";
 
 import { useStorageReady } from "@/hooks/use-storage";
 
@@ -14,6 +15,7 @@ type ProjectDataContextValue = {
   sprints: Sprint[];
   versions: Version[];
   stats: ProjectStats | null;
+  error: Error | null;
   reload: () => Promise<void>;
 };
 
@@ -34,22 +36,28 @@ export function ProjectDataProvider({
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [stats, setStats] = useState<ProjectStats | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   const reload = useCallback(async () => {
     if (!projectId) return;
-    const [projectData, issueData, sprintData, versionData, statsData] =
-      await Promise.all([
+    try {
+      const [projectData, issueData, sprintData, versionData, userData] = await Promise.all([
         getProjectById(projectId),
         getIssues(projectId),
         getSprints(projectId),
         getVersions(projectId),
-        getProjectStats(projectId),
+        getUsers(),
       ]);
-    setProject(projectData);
-    setIssues(issueData);
-    setSprints(sprintData);
-    setVersions(versionData);
-    setStats(statsData);
+      setProject(projectData);
+      setIssues(issueData);
+      setSprints(sprintData);
+      setVersions(versionData);
+      setStats(buildProjectStats(issueData, userData));
+      setError(null);
+    } catch (err) {
+      console.error("Failed to load project data", err);
+      setError(err instanceof Error ? err : new Error("Failed to load project data"));
+    }
   }, [projectId]);
 
   useEffect(() => {
@@ -66,9 +74,10 @@ export function ProjectDataProvider({
       sprints,
       versions,
       stats,
+      error,
       reload,
     }),
-    [ready, projectId, project, issues, sprints, versions, stats, reload],
+    [ready, projectId, project, issues, sprints, versions, stats, error, reload],
   );
 
   return (

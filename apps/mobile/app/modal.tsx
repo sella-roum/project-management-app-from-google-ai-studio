@@ -1,18 +1,30 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput } from "react-native";
+import { Pressable, ScrollView, StyleSheet } from "react-native";
 
 import type { IssuePriority, IssueStatus, IssueType, Project } from "@repo/core";
 import { CATEGORY_LABELS } from "@repo/core";
-import { USERS, createIssue, createProject, getProjects } from "@repo/storage";
+import {
+  USERS,
+  createIssue,
+  createProject,
+  getCurrentUserId,
+  getProjects,
+} from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Radius, Spacing } from "@/constants/theme";
 import { useStorageReady } from "@/hooks/use-storage";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function ModalScreen() {
   const router = useRouter();
   const ready = useStorageReady();
+  const borderSubtle = useThemeColor({}, "borderSubtle");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
   const { mode, projectId } = useLocalSearchParams<{
     mode?: string;
     projectId?: string;
@@ -48,17 +60,21 @@ export default function ModalScreen() {
     void load();
   }, [ready, projectId]);
 
+  const trimmedTitle = title.trim();
+  const trimmedDescription = description.trim();
+  const trimmedProjectName = projectName.trim();
+  const trimmedProjectKey = projectKey.trim().toUpperCase();
   const canSubmitIssue = useMemo(
-    () => selectedProjectId && title.trim().length > 0,
-    [selectedProjectId, title],
+    () => selectedProjectId && trimmedTitle.length > 0,
+    [selectedProjectId, trimmedTitle],
   );
 
   const handleCreateIssue = async () => {
     if (!canSubmitIssue) return;
     await createIssue({
       projectId: selectedProjectId,
-      title,
-      description,
+      title: trimmedTitle,
+      description: trimmedDescription,
       type: issueType,
       status,
       priority,
@@ -68,14 +84,17 @@ export default function ModalScreen() {
   };
 
   const handleCreateProject = async () => {
-    if (!projectName) return;
+    if (!trimmedProjectName) return;
+    const fallbackKey = trimmedProjectName.substring(0, 3).toUpperCase();
+    const safeKey = (trimmedProjectKey || fallbackKey).toUpperCase();
     await createProject({
-      name: projectName,
-      key: projectKey || projectName.substring(0, 3).toUpperCase(),
+      name: trimmedProjectName,
+      key: safeKey,
       type: projectType,
       category: projectCategory,
-      iconUrl: projectType === "Scrum" ? "??" : "??",
-      description,
+      iconUrl: undefined,
+      description: trimmedDescription,
+      leadId: getCurrentUserId(),
     });
     router.back();
   };
@@ -94,21 +113,20 @@ export default function ModalScreen() {
               onPress={() => setSelectedProjectId(project.id)}
               style={[
                 styles.option,
-                selectedProjectId === project.id && styles.optionActive,
+                { borderColor: borderSubtle },
+                selectedProjectId === project.id && { borderColor: brandPrimary },
               ]}
             >
               <ThemedText type="defaultSemiBold">{project.name}</ThemedText>
               <ThemedText>{project.key}</ThemedText>
             </Pressable>
           ))}
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Issue title"
             value={title}
             onChangeText={setTitle}
           />
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Description"
             value={description}
             onChangeText={setDescription}
@@ -120,7 +138,8 @@ export default function ModalScreen() {
               onPress={() => setIssueType(value)}
               style={[
                 styles.option,
-                issueType === value && styles.optionActive,
+                { borderColor: borderSubtle },
+                issueType === value && { borderColor: brandPrimary },
               ]}
             >
               <ThemedText>{value}</ThemedText>
@@ -134,7 +153,8 @@ export default function ModalScreen() {
               onPress={() => setStatus(value)}
               style={[
                 styles.option,
-                status === value && styles.optionActive,
+                { borderColor: borderSubtle },
+                status === value && { borderColor: brandPrimary },
               ]}
             >
               <ThemedText>{value}</ThemedText>
@@ -149,7 +169,8 @@ export default function ModalScreen() {
               onPress={() => setPriority(value)}
               style={[
                 styles.option,
-                priority === value && styles.optionActive,
+                { borderColor: borderSubtle },
+                priority === value && { borderColor: brandPrimary },
               ]}
             >
               <ThemedText>{value}</ThemedText>
@@ -162,37 +183,33 @@ export default function ModalScreen() {
               onPress={() => setAssigneeId(user.id)}
               style={[
                 styles.option,
-                assigneeId === user.id && styles.optionActive,
+                { borderColor: borderSubtle },
+                assigneeId === user.id && { borderColor: brandPrimary },
               ]}
             >
               <ThemedText>{user.name}</ThemedText>
             </Pressable>
           ))}
-          <Pressable
+          <Button
+            label="Create"
             onPress={handleCreateIssue}
             disabled={!canSubmitIssue}
-            style={styles.primaryButton}
-          >
-            <ThemedText type="link">Create</ThemedText>
-          </Pressable>
+          />
         </ThemedView>
       ) : (
         <ThemedView style={styles.section}>
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Project name"
             value={projectName}
             onChangeText={setProjectName}
           />
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Project key"
             value={projectKey}
             onChangeText={(value) => setProjectKey(value.toUpperCase())}
             maxLength={5}
           />
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Description"
             value={description}
             onChangeText={setDescription}
@@ -204,7 +221,8 @@ export default function ModalScreen() {
               onPress={() => setProjectCategory(value)}
               style={[
                 styles.option,
-                projectCategory === value && styles.optionActive,
+                { borderColor: borderSubtle },
+                projectCategory === value && { borderColor: brandPrimary },
               ]}
             >
               <ThemedText>{CATEGORY_LABELS[value]}</ThemedText>
@@ -216,20 +234,17 @@ export default function ModalScreen() {
               onPress={() => setProjectType(value)}
               style={[
                 styles.option,
-                projectType === value && styles.optionActive,
+                { borderColor: borderSubtle },
+                projectType === value && { borderColor: brandPrimary },
               ]}
             >
               <ThemedText>{value}</ThemedText>
             </Pressable>
           ))}
-          <Pressable onPress={handleCreateProject} style={styles.primaryButton}>
-            <ThemedText type="link">Create</ThemedText>
-          </Pressable>
+          <Button label="Create" onPress={handleCreateProject} />
         </ThemedView>
       )}
-      <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
-        <ThemedText type="link">Cancel</ThemedText>
-      </Pressable>
+      <Button label="Cancel" onPress={() => router.back()} variant="ghost" />
     </ScrollView>
   );
 }
@@ -237,39 +252,16 @@ export default function ModalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    gap: 16,
-    padding: 20,
-  },
-  input: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    gap: Spacing.l,
+    padding: Spacing.xl,
   },
   option: {
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
+    borderRadius: Radius.m,
     borderWidth: 1,
-    gap: 4,
-    padding: 10,
-  },
-  optionActive: {
-    borderColor: "#2563eb",
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  secondaryButton: {
-    alignItems: "center",
-    backgroundColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingVertical: 12,
+    gap: Spacing.xs,
+    padding: Spacing.m,
   },
   section: {
-    gap: 12,
+    gap: Spacing.m,
   },
 });

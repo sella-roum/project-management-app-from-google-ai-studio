@@ -1,93 +1,114 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { Alert, Pressable, StyleSheet } from "react-native";
+import { Alert, StyleSheet } from "react-native";
 import { useState } from "react";
 
 import { clearDatabase, seedDatabase } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/button";
+import { Elevation, Radius, Spacing } from "@/constants/theme";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const surfaceRaised = useThemeColor({}, "surfaceRaised");
+  const surfaceBase = useThemeColor({}, "surfaceBase");
+  const borderSubtle = useThemeColor({}, "borderSubtle");
+  const metaTextColor = useThemeColor({}, "textSecondary");
 
-  const handleDemoMode = async () => {
+  const runWithLoading = async (
+    action: () => Promise<void>,
+    logLabel: string,
+    alertMessage: string,
+  ) => {
     setLoading(true);
     try {
-      await seedDatabase();
-      await AsyncStorage.multiSet([
-        ["appInitialized", "true"],
-        ["hasSetup", "true"],
-      ]);
-      router.replace("/(auth)/login");
+      await action();
     } catch (error) {
-      console.error("Failed to start demo mode", error);
-      Alert.alert(
-        "初期化エラー",
-        "デモデータの準備に失敗しました。もう一度お試しください。",
-      );
+      console.error(logLabel, error);
+      Alert.alert("初期化エラー", alertMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFreshStart = async () => {
-    setLoading(true);
-    try {
-      await clearDatabase();
-      await AsyncStorage.setItem("appInitialized", "true");
-      await AsyncStorage.removeItem("hasSetup");
-      router.replace("/(auth)/login");
-    } catch (error) {
-      console.error("Failed to start fresh", error);
-      Alert.alert(
-        "初期化エラー",
-        "初期化に失敗しました。もう一度お試しください。",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleDemoMode = () =>
+    runWithLoading(
+      async () => {
+        await seedDatabase();
+        await AsyncStorage.multiSet([
+          ["appInitialized", "true"],
+          ["hasSetup", "true"],
+        ]);
+        router.replace("/(auth)/login");
+      },
+      "Failed to start demo mode",
+      "デモデータの準備に失敗しました。もう一度お試しください。",
+    );
+
+  const handleFreshStart = () =>
+    runWithLoading(
+      async () => {
+        await clearDatabase();
+        await AsyncStorage.setItem("appInitialized", "true");
+        await AsyncStorage.removeItem("hasSetup");
+        router.replace("/(auth)/login");
+      },
+      "Failed to start fresh",
+      "初期化に失敗しました。もう一度お試しください。",
+    );
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedView style={styles.card}>
+    <ThemedView style={[styles.container, { backgroundColor: surfaceBase }]}>
+      <ThemedView
+        style={[
+          styles.card,
+          { backgroundColor: surfaceRaised, borderColor: borderSubtle },
+        ]}
+      >
         <ThemedView style={styles.header}>
           <ThemedText type="title">JiraMobile Clone へようこそ</ThemedText>
-          <ThemedText style={styles.subtitle}>
+          <ThemedText type="body" style={[styles.subtitle, { color: metaTextColor }]}>
             モバイルファーストのプロジェクト管理体験を始めましょう。
             開始方法を選択してください。
           </ThemedText>
         </ThemedView>
         <ThemedView style={styles.optionGrid}>
-          <ThemedView style={styles.optionCard}>
-            <ThemedText type="subtitle">デモデータで開始</ThemedText>
-            <ThemedText style={styles.optionText}>
+          <ThemedView
+            style={[
+              styles.optionCard,
+              { borderColor: borderSubtle, backgroundColor: surfaceBase },
+            ]}
+          >
+            <ThemedText type="headline">デモデータで開始</ThemedText>
+            <ThemedText type="body" style={[styles.optionText, { color: metaTextColor }]}>
               サンプルプロジェクト、課題、ユーザーが含まれた状態で開始します。
             </ThemedText>
-            <Pressable
+            <Button
+              label={loading ? "準備中..." : "デモモード"}
               onPress={handleDemoMode}
               disabled={loading}
-              style={styles.primaryButton}
-            >
-              <ThemedText type="link">
-                {loading ? "準備中..." : "デモモード"}
-              </ThemedText>
-            </Pressable>
+            />
           </ThemedView>
-          <ThemedView style={styles.optionCard}>
-            <ThemedText type="subtitle">最初から開始</ThemedText>
-            <ThemedText style={styles.optionText}>
+          <ThemedView
+            style={[
+              styles.optionCard,
+              { borderColor: borderSubtle, backgroundColor: surfaceBase },
+            ]}
+          >
+            <ThemedText type="headline">最初から開始</ThemedText>
+            <ThemedText type="body" style={[styles.optionText, { color: metaTextColor }]}>
               空の状態から開始して、アカウントとプロジェクトを作成します。
             </ThemedText>
-            <Pressable
+            <Button
+              label="フレッシュスタート"
               onPress={handleFreshStart}
               disabled={loading}
-              style={styles.secondaryButton}
-            >
-              <ThemedText type="link">フレッシュスタート</ThemedText>
-            </Pressable>
+              variant="secondary"
+            />
           </ThemedView>
         </ThemedView>
       </ThemedView>
@@ -97,49 +118,34 @@ export default function WelcomeScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#0f172a",
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.xl,
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 24,
-    gap: 16,
-    padding: 24,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    gap: Spacing.l,
+    padding: Spacing.xl,
+    ...Elevation.medium,
   },
   header: {
-    gap: 8,
+    gap: Spacing.s,
   },
   optionCard: {
-    borderColor: "#e5e7eb",
-    borderRadius: 16,
     borderWidth: 1,
-    gap: 8,
-    padding: 16,
+    borderRadius: Radius.l,
+    gap: Spacing.s,
+    padding: Spacing.l,
   },
   optionGrid: {
-    gap: 12,
+    gap: Spacing.m,
   },
   optionText: {
-    color: "#6b7280",
     fontSize: 12,
   },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  secondaryButton: {
-    alignItems: "center",
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 12,
-  },
   subtitle: {
-    color: "#6b7280",
     fontSize: 12,
   },
 });

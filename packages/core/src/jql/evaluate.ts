@@ -7,7 +7,9 @@ export const executeJQL = (jql: string, issues: Issue[]): Issue[] => {
     if (clauses.length === 0) return issues;
     return issues.filter((issue) => {
       return clauses.every(({ field, value }) => {
-        return String((issue as Record<string, unknown>)[field]) === value;
+        return (
+          String((issue as unknown as Record<string, unknown>)[field]) === value
+        );
       });
     });
   } catch (e) {
