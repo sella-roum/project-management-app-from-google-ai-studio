@@ -1,133 +1,151 @@
-# AGENTS.md
+# Codex Working Agreement
 
-このリポジトリは **Web（参照実装）を元に Mobile を作成**しています。  
-**Web と Mobile の機能・動作・画面構成の一致（Feature Parity）を最優先**に開発してください。
-
----
-
-## 0. 最重要ルール（必ず守る）
-
-1) **Web が仕様の一次情報**（source of truth）。Mobile 側は必ず追従する。  
-2) 変更は **縦割り（UI→状態→永続化→ナビ→テスト）で小さく**。差分が大きい変更は分割する。  
-3) **共通ロジックは packages に集約**（@repo/core / @repo/storage）。アプリ側に複製しない。  
-4) **Parity を壊す変更は禁止**：Web に機能追加/仕様変更したら、同PR内で Mobile も同等にする。  
-5) 変更後は **lint / typecheck / テスト / 起動確認** を通す（下記「品質ゲート」）。
+Codex must follow this document before doing any work in this repository.
+(Reason: Codex reads AGENTS.md before starting tasks.) 
 
 ---
 
-## 1. 開発方針（好ましい手法）
+## 0. Always read first (in this order)
+1) docs/PROJECT_CONTEXT.md
+2) docs/adr/ (scan recent ADRs)
+3) .codex/runs/ (if any recent run exists)
+4) This AGENTS.md
 
-### Parity-Driven Development（推奨）
-- 1タスク = 1機能の **Web↔Mobile 同等性** を完成させる単位
-- 実装順：  
-  (a) 仕様確認（Web挙動）→ (b) 共有モデル/ストレージ整備 → (c) Mobile UI 実装 → (d) 画面遷移/導線 → (e) 回帰確認
-- 完了条件（Definition of Done）：
-  - Web と Mobile で **同じ導線・同じ操作・同じ結果**（保存/更新/削除/検索/通知/既読など）
-  - docs/feature_parity.md の該当項目に差分がない（または「意図的な差」を明記）
-  - 品質ゲートを全て通過
-
-### 変更設計の原則
-- **UI差は許容するが、情報設計と機能差は許容しない**  
-  （例：Drawer vs Fullscreen はOK、ただし表示項目・編集可否・操作結果は一致）
-- 型・データ構造変更は、必ず以下を同時に更新：
-  - @repo/core（型/定数/ラベル/遷移定義など）
-  - @repo/storage（Web永続化 + Mobile永続化の両方）
-  - 影響する画面（Web + Mobile）
-  - 既存データの互換（マイグレーション/デフォルト）
+> Keep `docs/PROJECT_CONTEXT.md` as a living document by updating it when new understanding is gained.
+> Record significant architecture decisions as ADRs.
 
 ---
 
-## 2. リポジトリ構造（ざっくり）
+## 1. Run initialization (per request)
+### Run ID
+- Use `run_id = YYYYMMDD-HHMMSS-JST` (e.g., `20260118-143012-JST`)
 
-- apps/web : Web UI（Vite/React）
-- apps/mobile : Mobile UI（Expo / expo-router）
-- packages/core : 共通の型・定数・ドメイン定義
-- packages/storage : 永続化レイヤ（Web: Dexie / Mobile: expo-sqlite 等）
-
----
-
-## 3. まず最初に確認する資料
-
-- docs/feature_parity.md（Web→Mobile のルーティング・導線・差分がまとまっている）
-- Web 側の同機能の画面/コンポーネント（Mobile 実装の参照元）
-
----
-
-## 4. よくある差分ポイント（実装時の注意）
-
-- **導線の差**（例：WebのTopBarのグローバル作成、MobileのFAB/各画面ボタン）
-  - 「どこから作れるか」「戻り先」「キャンセル」「バリデーション」まで合わせる
-- **Setup / 初期化の流れ**
-  - Webの「どの画面でもウィザード表示」相当を、Mobileでも実質同等になるように揃える
-- **Issue詳細**
-  - Drawer/Fullscreen の差はOK。ただし表示フィールド・編集項目・関連リンク（Projectへ遷移等）は一致させる
+### Create a new run folder
+If no active run folder is specified by the user **and** you have not already created a run folder earlier in the same conversation/session:
+1) Create: `.codex/runs/<run_id>/`
+2) Copy templates:
+   - `.codex/templates/PLAN.md`  -> `.codex/runs/<run_id>/PLAN.md`
+   - `.codex/templates/TASKS.md` -> `.codex/runs/<run_id>/TASKS.md`
+   - `.codex/templates/REPORT.md`-> `.codex/runs/<run_id>/REPORT.md`
+3) Write the user request into PLAN.md (Objective / Scope / DoD)
+4) Build TASKS.md as an executable checkbox list ordered top-to-bottom
+5) **Same-session rule**: In the same conversation/session, keep updating the same PLAN/TASKS/REPORT files. Do not create a new run folder per turn unless the user explicitly asks to start a new run.
 
 ---
 
-## 5. 作業手順（Codexの動き）
-
-1) **対象機能を特定**（Parity観点で「Webで出来ること」を箇条書き）
-2) **影響範囲を列挙**（Web / Mobile / core / storage）
-3) **小さなコミット単位**で実装（ただしPRは1機能で完結）
-4) **品質ゲート**を実行
-5) Parityの観点で **手動確認**（WebとMobileで同じシナリオを再現）
-6) docs/feature_parity.md に差分が残る場合は、理由と対応予定を明記
-
----
-
-## 6. 品質ゲート（必須）
-
-最低限、変更に応じて以下を実行してパスさせる：
-
-- lint（全体 or 影響パッケージ）
-- typecheck（全体 or 影響パッケージ）
-- unit/integration tests（存在する場合は必ず）
-- 起動確認
-  - Web: dev server 起動 → 主要導線を1往復
-  - Mobile: Expo 起動 → 該当画面の導線を1往復
-
-※ scripts が不足している場合は、まず scripts / eslint / prettier / typecheck を整備してから機能追加する。
+## 2. Execution loop (do this until done or blocked)
+1) Execute tasks in `.codex/runs/<run_id>/TASKS.md` top-to-bottom
+2) After completing a task:
+   - Check the box in TASKS.md
+   - Append a new entry to REPORT.md (JST timestamp)
+   - Update progress percent (see §3) in the REPORT entry
+3) If new tasks are discovered:
+   - Add them under `## Discovered` in TASKS.md
+   - Note why they appeared in REPORT.md
+   - Continue execution
+4) Stop only when:
+   - All non-blocked tasks are done, or
+   - You are blocked (then write a “Blocked” entry with concrete next actions)
 
 ---
 
-## 7. 実行コマンド（標準）
+## 3. Progress % definition (must be used in reporting)
+### How to calculate
+- Count tasks in `## Now` + `## Discovered` as the denominator
+- Exclude tasks under `## Blocked` from the denominator
+- Progress = round( done / total * 100 )
 
-### Install
-- リポジトリルートで依存関係をインストール
+Where:
+- total = number of checkboxes in Now + Discovered
+- done  = number of checked boxes in Now + Discovered
 
-### Mobile（Expo）
-- ルートから起動（用意されている場合）： `npm run mobile:start`
-- キャッシュクリア： `npm run mobile:clear`
-- apps/mobile 直下から： `npx expo start`
-- apps/mobile 直下でキャッシュクリア： `npx expo start --clear`
-
----
-
-## 8. コーディング規約（最低限）
-
-- TypeScript: `any` を増やさない。必要なら型を core に追加。
-- UI: 同じ概念は同じ名称（label / status / priority / issueType）を使う
-- 共有ロジック:
-  - ビジネスルール = packages/core
-  - 永続化I/F = packages/storage
-  - 画面表示の都合だけ = apps/*
+### Required progress line format
+- `Progress: <NN>% (<done>/<total>)`
 
 ---
 
-## 9. “Parity 破壊” を防ぐチェックリスト（PR提出前）
+## 4. User-facing report (MANDATORY in every response to the user)
+Whenever you send a message to the user (chat reply / PR comment / final output), include:
 
-- [ ] docs/feature_parity.md の該当箇所を確認し、差分がない（または意図的差分を明記）
-- [ ] Web と Mobile で同じユーザーストーリーを再現し、結果が一致
-- [ ] 追加/変更したフィールドが core / storage / 両アプリに反映
-- [ ] lint/typecheck/test が通る
-- [ ] エラー時の挙動（空状態/通信なし/例外）が両方で破綻しない
+1) **Summary (<= 5 bullets)**: what you changed / verified / decided
+2) **Progress line** using §3 format
+3) **Next** (if not 100%): next 1–3 tasks or what is blocked
+4) **Evidence**: commands run + results, and/or key file paths changed
+
+Example (format only):
+- Summary:
+  - ...
+- Progress: 45% (5/11)
+- Next:
+  - ...
+- Evidence:
+  - `npm test` => PASS
+  - Changed: path/to/file.ts
+
+## Language policy (thinking in English, output in Japanese)
+- Internal thinking: English.
+- User-facing output: Japanese (summaries, progress reports, explanations, PRコメント、.mdドキュメントの追記を含む).
+- Do NOT reveal chain-of-thought / internal reasoning. Only provide concise conclusions and evidence.
+- Code: follow existing code style; do not translate identifiers unless the repo convention does.
 
 ---
 
-## 10. Codexへの注意（運用）
+## 5. Living documentation rule (do not skip)
+- When you learn something new about the codebase (structure, gotchas, workflows, invariants):
+  - Update `docs/PROJECT_CONTEXT.md` (add concise notes, keep it readable)
+- When you make a significant architectural decision (interfaces, data model, dependency direction, build/deploy strategy):
+  - Add/update an ADR under `docs/adr/` (keep it short and decision-focused)
 
-- 破壊的操作（大量削除/リネーム/依存の大幅更新）は避け、必要なら理由を明記して最小差分で行う。
-- 仕様が曖昧な場合は「Webの現状挙動」を仕様として採用し、Mobileを合わせる。
-- AGENTS.md の指示は最優先。長いセッションで指示が薄れた場合は、作業冒頭でこのファイルを再確認すること。
+(ADR practice reference: store decisions with context + consequences.) 
 
 ---
+
+## 6. Quality gates (before claiming done)
+- Run relevant checks depending on the change:
+  - unit/integration tests
+  - lint
+  - typecheck
+  - build
+- If tests are not available, state it explicitly in REPORT and in the user-facing report.
+
+---
+
+## 7. Safety / scope constraints
+- Do not run destructive commands (delete/format disk, force push, etc.) unless explicitly requested
+- Do not modify unrelated files; keep changes scoped
+- Prefer small, reviewable commits (if committing)
+- If assumptions are required, write them into PLAN.md and REPORT.md
+
+---
+
+## 8. “One-shot to the end” instruction (copy/paste for `codex exec`)
+Use this prompt as-is when running Codex in non-interactive mode (or as the initial prompt).
+
+PROMPT START
+You are Codex working in this repository. Follow AGENTS.md strictly.
+
+Goal: Implement the user request end-to-end.
+
+Process requirements:
+- If no active run exists, create `.codex/runs/<run_id>/` using `run_id = YYYYMMDD-HHMMSS-JST` and copy from `.codex/templates/{PLAN,TASKS,REPORT}.md`.
+- Fill `.codex/runs/<run_id>/PLAN.md` (Objective/Scope/Assumptions/DoD) and create an ordered checkbox list in `.codex/runs/<run_id>/TASKS.md`.
+- Execute tasks top-to-bottom. After each completed task:
+  - Check the box in TASKS.md
+  - Append an entry to REPORT.md with JST timestamp
+  - Include `Progress: <NN>% (<done>/<total>)` using AGENTS.md §3
+- If you discover new tasks, add them under `## Discovered` and continue.
+- Continuously update `docs/PROJECT_CONTEXT.md` with any new understanding.
+- For significant architectural decisions, add/update an ADR under `docs/adr/`.
+- Run relevant checks (tests/lint/typecheck/build) before finishing.
+
+User-facing output requirement (every time you respond):
+- Provide <=5 bullet summary + progress percent + next steps (if not done) + evidence (commands/results and key file paths).
+
+Now perform the work.
+PROMPT END
+
+---
+
+## Notes (source pointers)
+- Codex reads AGENTS.md before doing work; use it to encode project-specific norms.
+- `codex exec` can run non-interactively; GitHub Action can run it in CI.
