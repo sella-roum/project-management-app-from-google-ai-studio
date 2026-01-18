@@ -71,7 +71,7 @@ type ProjectViewProps = {
 
 export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) {
   const router = useRouter();
-  const { ready, projectId, project, issues, sprints, versions, stats, reload } =
+  const { ready, projectId, project, issues, sprints, versions, stats, error, reload } =
     useProjectData();
   const normalizedProjectId = projectId;
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>(initialTab);
@@ -161,6 +161,11 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (!error) return;
+    Alert.alert("読み込みエラー", "プロジェクトデータの取得に失敗しました。");
+  }, [error]);
 
   useEffect(() => {
     const workflow = (project?.workflowSettings ??

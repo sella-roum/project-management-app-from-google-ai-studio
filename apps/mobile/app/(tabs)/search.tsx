@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Modal,
   LayoutAnimation,
   Pressable,
@@ -127,9 +128,9 @@ export default function SearchScreen() {
     return sorted;
   }, [issues, isJqlMode, query, activeFilter, filterProjectId, sortKey]);
 
-  useEffect(() => {
+  const animateLayoutChange = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-  }, [filteredIssues.length, activeTab, isJqlMode]);
+  };
 
   const recentIssues = useMemo(
     () =>
@@ -160,29 +161,45 @@ export default function SearchScreen() {
 
   const handleSaveFilter = async () => {
     if (!filterName) return;
-    let finalQuery = query;
-    if (!isJqlMode && activeFilter) {
-      const uid = getCurrentUserId();
-      finalQuery =
-        activeFilter === "assigned"
-          ? `assigneeId = ${uid}`
-          : `reporterId = ${uid}`;
+    try {
+      let finalQuery = query;
+      if (!isJqlMode && activeFilter) {
+        const uid = getCurrentUserId();
+        finalQuery =
+          activeFilter === "assigned"
+            ? `assigneeId = ${uid}`
+            : `reporterId = ${uid}`;
+      }
+      await saveFilter(filterName, finalQuery, undefined, isJqlMode);
+      await reloadSavedFilters();
+      setFilterName("");
+      animateLayoutChange();
+      setActiveTab("saved");
+      setSaveModalOpen(false);
+    } catch (error) {
+      console.error("Failed to save filter:", error);
+      Alert.alert("エラー", "フィルターの保存に失敗しました。");
     }
-    await saveFilter(filterName, finalQuery, undefined, isJqlMode);
-    await reloadSavedFilters();
-    setFilterName("");
-    setActiveTab("saved");
-    setSaveModalOpen(false);
   };
 
   const handleToggleFavorite = async (id: string, isFavorite: boolean) => {
-    await updateSavedFilter(id, { isFavorite: !isFavorite });
-    await reloadSavedFilters();
+    try {
+      await updateSavedFilter(id, { isFavorite: !isFavorite });
+      await reloadSavedFilters();
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+      Alert.alert("エラー", "お気に入りの更新に失敗しました。");
+    }
   };
 
   const handleDeleteFilter = async (id: string) => {
-    await deleteSavedFilter(id);
-    await reloadSavedFilters();
+    try {
+      await deleteSavedFilter(id);
+      await reloadSavedFilters();
+    } catch (error) {
+      console.error("Failed to delete filter:", error);
+      Alert.alert("エラー", "フィルターの削除に失敗しました。");
+    }
   };
 
   const JQL_FIELDS = [
@@ -201,6 +218,7 @@ export default function SearchScreen() {
   ];
 
   const handleJqlChange = (value: string) => {
+    animateLayoutChange();
     setQuery(value);
     const words = value.split(" ");
     const lastWord = words[words.length - 1].toLowerCase();
@@ -215,10 +233,46 @@ export default function SearchScreen() {
   };
 
   const applySuggestion = (suggestion: string) => {
+    animateLayoutChange();
     const words = query.split(" ");
     words[words.length - 1] = suggestion;
     setQuery(`${words.join(" ")} `);
     setJqlSuggestions([]);
+  };
+
+  const handleQueryChange = (value: string) => {
+    animateLayoutChange();
+    setQuery(value);
+  };
+
+  const handleSortChange = (value: SortKey) => {
+    animateLayoutChange();
+    setSortKey(value);
+  };
+
+  const handleTabChange = (mode: "basic" | "jql") => {
+    animateLayoutChange();
+    setIsJqlMode(mode === "jql");
+  };
+
+  const handleSavedTabToggle = () => {
+    animateLayoutChange();
+    setActiveTab(activeTab === "all" ? "saved" : "all");
+  };
+
+  const handleAdvancedToggle = () => {
+    animateLayoutChange();
+    setShowAdvanced((prev) => !prev);
+  };
+
+  const handleActiveFilterChange = (filter: string | null) => {
+    animateLayoutChange();
+    setActiveFilter(filter);
+  };
+
+  const handleProjectFilterChange = (projectId: string) => {
+    animateLayoutChange();
+    setFilterProjectId(projectId);
   };
 
   return (
@@ -255,6 +309,7 @@ export default function SearchScreen() {
                     <Pressable
                       key={filter.id}
                       onPress={() => {
+                        animateLayoutChange();
                         setIsJqlMode(filter.isJqlMode);
                         setQuery(filter.query);
                         setActiveTab("all");
@@ -322,7 +377,7 @@ export default function SearchScreen() {
       ) : null}
       <ThemedView style={styles.tabRow}>
         <Pressable
-          onPress={() => setIsJqlMode(false)}
+          onPress={() => handleTabChange("basic")}
           style={[
             styles.tab,
             { borderColor: borderSubtle },
@@ -332,7 +387,7 @@ export default function SearchScreen() {
           <ThemedText type="body">ベーシック</ThemedText>
         </Pressable>
         <Pressable
-          onPress={() => setIsJqlMode(true)}
+          onPress={() => handleTabChange("jql")}
           style={[
             styles.tab,
             { borderColor: borderSubtle },
@@ -342,7 +397,7 @@ export default function SearchScreen() {
           <ThemedText type="body">JQL</ThemedText>
         </Pressable>
         <Pressable
-          onPress={() => setActiveTab(activeTab === "all" ? "saved" : "all")}
+          onPress={handleSavedTabToggle}
           style={[styles.tab, { borderColor: borderSubtle }]}
         >
           <ThemedText type="body">
@@ -375,7 +430,7 @@ export default function SearchScreen() {
           <SearchSortRow
             sortKey={sortKey}
             sortOptions={sortOptions}
-            onSortChange={setSortKey}
+            onSortChange={handleSortChange}
           />
           <Button label="この検索を保存" onPress={() => setSaveModalOpen(true)} />
         </ThemedView>
@@ -384,18 +439,18 @@ export default function SearchScreen() {
           <Input
             placeholder="課題キー、タイトルを検索..."
             value={query}
-            onChangeText={setQuery}
+            onChangeText={handleQueryChange}
           />
           {activeFilter || filterProjectId || query ? (
             <ThemedView style={styles.chipRow}>
               {query ? (
-                <Pressable onPress={() => setQuery("")}>
+                <Pressable onPress={() => handleQueryChange("")}>
                   <Chip label={`検索中: ${query}`} style={styles.chip} />
                 </Pressable>
               ) : null}
               {activeFilter ? (
                 <Pressable
-                  onPress={() => setActiveFilter(null)}
+                  onPress={() => handleActiveFilterChange(null)}
                 >
                   <Chip
                     label={activeFilter === "assigned" ? "自分の担当" : "報告済み"}
@@ -405,7 +460,7 @@ export default function SearchScreen() {
               ) : null}
               {filterProjectId ? (
                 <Pressable
-                  onPress={() => setFilterProjectId("")}
+                  onPress={() => handleProjectFilterChange("")}
                 >
                   <Chip
                     label={
@@ -420,7 +475,7 @@ export default function SearchScreen() {
           ) : null}
           <ThemedView style={styles.filterRow}>
             <Pressable
-              onPress={() => setShowAdvanced((prev) => !prev)}
+              onPress={handleAdvancedToggle}
               style={[
                 styles.filterButton,
                 { borderColor: borderSubtle },
@@ -437,7 +492,7 @@ export default function SearchScreen() {
               </View>
             </Pressable>
             <Pressable
-              onPress={() => setActiveFilter("assigned")}
+              onPress={() => handleActiveFilterChange("assigned")}
               style={[
                 styles.filterButton,
                 { borderColor: borderSubtle },
@@ -462,7 +517,7 @@ export default function SearchScreen() {
               </View>
             </Pressable>
             <Pressable
-              onPress={() => setActiveFilter("reported")}
+              onPress={() => handleActiveFilterChange("reported")}
               style={[
                 styles.filterButton,
                 { borderColor: borderSubtle },
@@ -487,13 +542,16 @@ export default function SearchScreen() {
               </View>
             </Pressable>
             <Pressable
-              onPress={() => setActiveFilter(null)}
+              onPress={() => handleActiveFilterChange(null)}
               style={[styles.filterButton, { borderColor: borderSubtle }]}
             >
               <ThemedText type="body">クリア</ThemedText>
             </Pressable>
             <Pressable
-              onPress={() => setSaveModalOpen(true)}
+              onPress={() => {
+                animateLayoutChange();
+                setSaveModalOpen(true);
+              }}
               style={[styles.filterButton, { borderColor: borderSubtle }]}
             >
               <ThemedText type="body">保存</ThemedText>
@@ -503,7 +561,7 @@ export default function SearchScreen() {
             <ThemedView style={styles.section}>
               <ThemedText type="headline">プロジェクト</ThemedText>
               <Pressable
-                onPress={() => setFilterProjectId("")}
+                onPress={() => handleProjectFilterChange("")}
                 style={[
                   styles.filterButton,
                   { borderColor: borderSubtle },
@@ -530,7 +588,7 @@ export default function SearchScreen() {
               {projects.map((project) => (
                 <Pressable
                   key={project.id}
-                  onPress={() => setFilterProjectId(project.id)}
+                  onPress={() => handleProjectFilterChange(project.id)}
                   style={[
                     styles.filterButton,
                     { borderColor: borderSubtle },
@@ -560,7 +618,7 @@ export default function SearchScreen() {
           <SearchSortRow
             sortKey={sortKey}
             sortOptions={sortOptions}
-            onSortChange={setSortKey}
+            onSortChange={handleSortChange}
           />
         </ThemedView>
       )}
@@ -580,6 +638,7 @@ export default function SearchScreen() {
               >
                 <Pressable
                   onPress={() => {
+                    animateLayoutChange();
                     setIsJqlMode(filter.isJqlMode);
                     setQuery(filter.query);
                     setActiveTab("all");
@@ -647,7 +706,12 @@ export default function SearchScreen() {
         onRequestClose={() => setSaveModalOpen(false)}
       >
         <ThemedView style={styles.modalOverlay}>
-          <View style={[styles.modalBackdrop, { backgroundColor: modalOverlayColor }]} />
+          <Pressable
+            style={[styles.modalBackdrop, { backgroundColor: modalOverlayColor }]}
+            onPress={() => setSaveModalOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="モーダルを閉じる"
+          />
           <ThemedView style={[styles.modalCard, { backgroundColor: surfaceRaised }]}>
             <ThemedText type="headline">保存済みフィルタ</ThemedText>
             <Input

@@ -15,6 +15,7 @@ type ProjectDataContextValue = {
   sprints: Sprint[];
   versions: Version[];
   stats: ProjectStats | null;
+  error: Error | null;
   reload: () => Promise<void>;
 };
 
@@ -35,21 +36,28 @@ export function ProjectDataProvider({
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [stats, setStats] = useState<ProjectStats | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   const reload = useCallback(async () => {
     if (!projectId) return;
-    const [projectData, issueData, sprintData, versionData, userData] = await Promise.all([
-      getProjectById(projectId),
-      getIssues(projectId),
-      getSprints(projectId),
-      getVersions(projectId),
-      getUsers(),
-    ]);
-    setProject(projectData);
-    setIssues(issueData);
-    setSprints(sprintData);
-    setVersions(versionData);
-    setStats(buildProjectStats(issueData, userData));
+    try {
+      const [projectData, issueData, sprintData, versionData, userData] = await Promise.all([
+        getProjectById(projectId),
+        getIssues(projectId),
+        getSprints(projectId),
+        getVersions(projectId),
+        getUsers(),
+      ]);
+      setProject(projectData);
+      setIssues(issueData);
+      setSprints(sprintData);
+      setVersions(versionData);
+      setStats(buildProjectStats(issueData, userData));
+      setError(null);
+    } catch (err) {
+      console.error("Failed to load project data", err);
+      setError(err instanceof Error ? err : new Error("Failed to load project data"));
+    }
   }, [projectId]);
 
   useEffect(() => {
@@ -66,9 +74,10 @@ export function ProjectDataProvider({
       sprints,
       versions,
       stats,
+      error,
       reload,
     }),
-    [ready, projectId, project, issues, sprints, versions, stats, reload],
+    [ready, projectId, project, issues, sprints, versions, stats, error, reload],
   );
 
   return (

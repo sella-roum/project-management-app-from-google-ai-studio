@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
-import type { Issue } from "@repo/core";
+import type { Issue, IssuePriority, IssueStatus } from "@repo/core";
 import { PRIORITY_LABELS, STATUS_LABELS, TYPE_LABELS } from "@repo/core";
 
 import { ThemedText } from "@/components/themed-text";
@@ -13,14 +13,14 @@ type IssueCardProps = {
   onPress?: () => void;
 };
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<IssueStatus, string> = {
   "To Do": "#94a3b8",
   "In Progress": "#2563eb",
   "In Review": "#f59e0b",
   Done: "#16a34a",
 };
 
-const PRIORITY_COLORS: Record<string, string> = {
+const PRIORITY_COLORS: Record<IssuePriority, string> = {
   Highest: "#b91c1c",
   High: "#f97316",
   Medium: "#2563eb",
@@ -46,6 +46,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={!onPress}
       style={[
         styles.card,
         { backgroundColor: cardBackground, borderColor: subtleBorder },
@@ -58,7 +59,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
         <Chip
           label={STATUS_LABELS[issue.status]}
           variant="solid"
-          backgroundColor={STATUS_COLORS[issue.status] ?? "#94a3b8"}
+          backgroundColor={STATUS_COLORS[issue.status]}
           textColor={textOnBrand}
         />
       </View>
@@ -69,7 +70,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
         <Chip label={TYPE_LABELS[issue.type]} />
         <Chip
           label={PRIORITY_LABELS[issue.priority]}
-          borderColor={PRIORITY_COLORS[issue.priority] ?? "#94a3b8"}
+          borderColor={PRIORITY_COLORS[issue.priority]}
           textColor={isHighPriority ? "#b91c1c" : undefined}
         />
         {dueDate ? (
@@ -108,6 +109,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.s,
   },
   rowBetween: {
