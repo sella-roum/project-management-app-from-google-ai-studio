@@ -215,10 +215,12 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
     useState<AutomationRule["trigger"]>("issue_created");
   const [ruleAction, setRuleAction] =
     useState<AutomationRule["action"]>("assign_reporter");
+  const isAnyModalOpen =
+    showNotificationEditor || showAutomationForm || showWorkflowEditor || Boolean(completeSprint);
 
   useEffect(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-  }, [showNotificationEditor, showAutomationForm, showWorkflowEditor, completeSprint]);
+  }, [isAnyModalOpen]);
 
   const triggerLabelMap: Record<AutomationRule["trigger"], string> = {
     issue_created: "課題の作成時",

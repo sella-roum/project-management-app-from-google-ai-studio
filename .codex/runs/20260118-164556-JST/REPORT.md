@@ -275,3 +275,46 @@
 - Remaining:
   - なし
 - Progress: 100% (9/9)
+
+## 2026-01-24 08:07 (JST)
+- Summary:
+  - ルート命名を単数形に統一し、モーダルアニメーションの依存を整理。
+- Completed:
+  - projects/[projectId] ルートの削除と project/[projectId] への統一。
+  - useSegments の型キャストを撤去。
+  - LayoutAnimation の依存を単一フラグに集約。
+- Changes:
+  - apps/mobile/app/_layout.tsx
+  - apps/mobile/app/(tabs)/projects.tsx
+  - apps/mobile/app/project/[projectId]/index.tsx
+  - apps/mobile/app/projects/[projectId]/index.tsx
+  - .codex/runs/20260118-164556-JST/TASKS.md
+- Commands:
+  - `npm --workspace apps/mobile run lint` => pending
+  - `npm --workspace apps/mobile run typecheck` => pending
+- Notes/Decisions:
+  - ルートは project/[projectId] に統一。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (10/10)
+
+## 2026-01-24 08:09 (JST)
+- Summary:
+  - lint/typecheck を実行して確認。
+- Completed:
+  - `npm --workspace apps/mobile run lint`
+  - `npm --workspace apps/mobile run typecheck`
+- Changes:
+  - なし
+- Commands:
+  - `npm --workspace apps/mobile run lint` => ok（警告: Unknown env config "http-proxy"）
+  - `npm --workspace apps/mobile run typecheck` => ok（警告: Unknown env config "http-proxy"）
+- Notes/Decisions:
+  - npm の環境警告は既存設定由来。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (10/10)
