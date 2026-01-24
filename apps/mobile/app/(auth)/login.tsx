@@ -28,6 +28,7 @@ export default function LoginScreen() {
   const errorText = useThemeColor({}, "stateErrorText");
   const errorBg = useThemeColor({}, "stateErrorBg");
   const errorBorder = useThemeColor({}, "stateErrorText");
+  const textOnBrand = useThemeColor({}, "textOnBrand");
   const metaTextColor = useThemeColor({}, "textSecondary");
   const footerTextColor = useThemeColor({}, "textTertiary");
 
@@ -72,7 +73,9 @@ export default function LoginScreen() {
     <ThemedView style={styles.container}>
       <ThemedView style={styles.header}>
         <ThemedView style={[styles.logo, { backgroundColor: brandPrimary }]}>
-          <ThemedText style={styles.logoText}>J</ThemedText>
+          <ThemedText style={[styles.logoText, { color: textOnBrand }]}>
+            J
+          </ThemedText>
         </ThemedView>
         <ThemedText type="title">JiraMobile</ThemedText>
         <ThemedText type="body" style={[styles.tagline, { color: metaTextColor }]}>
@@ -180,7 +183,6 @@ const styles = StyleSheet.create({
     width: 56,
   },
   logoText: {
-    color: "#fff",
     fontSize: 24,
     fontWeight: "700",
   },

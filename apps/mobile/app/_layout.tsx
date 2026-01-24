@@ -8,7 +8,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function RootLayout() {
   const router = useRouter();
-  const segments = useSegments();
+  const segments = useSegments() as string[];
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const modalBackdropColor = useThemeColor({}, "stateInfoBg");
 
@@ -59,11 +59,10 @@ export default function RootLayout() {
           animationDuration: 250,
         }}
       >
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="issue/[issueId]" options={{ title: "Issue" }} />
         <Stack.Screen name="project/[projectId]" options={{ title: "Project" }} />
-        <Stack.Screen name="projects/[projectId]" options={{ title: "Project" }} />
+        <Stack.Screen name="projects/[projectId]/index" options={{ title: "Project" }} />
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: "modal" }} />
       </Stack>

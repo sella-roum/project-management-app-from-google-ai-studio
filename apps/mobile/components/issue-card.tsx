@@ -13,6 +13,7 @@ type IssueCardProps = {
   onPress?: () => void;
 };
 
+// 例外的に固定色を使用（ステータス/優先度の識別色）
 const STATUS_COLORS: Record<IssueStatus, string> = {
   "To Do": "#94a3b8",
   "In Progress": "#2563eb",
@@ -71,7 +72,7 @@ export function IssueCard({ issue, onPress }: IssueCardProps) {
         <Chip
           label={PRIORITY_LABELS[issue.priority]}
           borderColor={PRIORITY_COLORS[issue.priority]}
-          textColor={isHighPriority ? "#b91c1c" : undefined}
+          textColor={isHighPriority ? errorText : undefined}
         />
         {dueDate ? (
           <Chip
