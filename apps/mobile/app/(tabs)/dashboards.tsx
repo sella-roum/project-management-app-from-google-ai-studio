@@ -8,12 +8,24 @@ import { getCurrentUserId, getIssues, getProjects } from "@repo/storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Skeleton } from "@/components/skeleton";
+import { strings } from "@/constants/strings";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { useStorageReady } from "@/hooks/use-storage";
 
+// 例外的に固定色を使用（データ可視化用の識別色）
 const CHART_COLORS = ["#0052CC", "#36B37E", "#FFAB00", "#FF5630", "#00B8D9"];
 
 export default function DashboardsScreen() {
   const ready = useStorageReady();
+  const borderColor = useThemeColor({}, "borderSubtle");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const textTertiary = useThemeColor({}, "textTertiary");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
+  const surfaceRaised = useThemeColor({}, "surfaceRaised");
+  const surfaceOverlay = useThemeColor({}, "surfaceOverlay");
+  const warningBg = useThemeColor({}, "stateWarningBg");
+  const warningText = useThemeColor({}, "stateWarningText");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeGadgetIds, setActiveGadgetIds] = useState<string[]>([]);
@@ -143,34 +155,70 @@ export default function DashboardsScreen() {
     setShowAddModal(false);
   };
 
+  if (!ready) {
+    return (
+      <ScrollView contentContainerStyle={styles.container}>
+        <ThemedView style={styles.header}>
+          <ThemedView>
+            <ThemedText type="title">{strings.common.dashboardsTitle}</ThemedText>
+            <ThemedText style={[styles.subtleText, { color: textSecondary }]}>
+              プロジェクトの概況を確認できます。
+            </ThemedText>
+          </ThemedView>
+        </ThemedView>
+        {[...Array(3)].map((_, index) => (
+          <ThemedView
+            key={`skeleton-${index}`}
+            style={[styles.card, { backgroundColor: surfaceRaised }]}
+          >
+            <Skeleton height={18} width={160} />
+            <Skeleton height={12} width={220} />
+            <Skeleton height={12} width={200} />
+          </ThemedView>
+        ))}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <ThemedView style={styles.header}>
         <ThemedView>
-          <ThemedText type="title">Dashboards</ThemedText>
-          <ThemedText style={styles.subtleText}>
+          <ThemedText type="title">{strings.common.dashboardsTitle}</ThemedText>
+          <ThemedText style={[styles.subtleText, { color: textSecondary }]}>
             プロジェクトの概況を確認できます。
           </ThemedText>
         </ThemedView>
-        <Pressable onPress={() => setShowAddModal(true)} style={styles.secondaryButton}>
-          <ThemedText>ガジェット追加</ThemedText>
+        <Pressable
+          onPress={() => setShowAddModal(true)}
+          style={[styles.secondaryButton, { borderColor: brandPrimary }]}
+        >
+          <ThemedText>{strings.common.addGadget}</ThemedText>
         </Pressable>
       </ThemedView>
 
       {activeGadgetIds.map((id) => (
-        <ThemedView key={id} style={styles.card}>
+        <ThemedView
+          key={id}
+          style={[styles.card, { backgroundColor: surfaceRaised }]}
+        >
           <ThemedView style={styles.cardHeader}>
             <ThemedText type="defaultSemiBold">
               {availableGadgets.find((g) => g.id === id)?.title ?? id}
             </ThemedText>
-            <Pressable onPress={() => removeGadget(id)} style={styles.ghostButton}>
+            <Pressable
+              onPress={() => removeGadget(id)}
+              style={[styles.ghostButton, { borderColor }]}
+            >
               <ThemedText>削除</ThemedText>
             </Pressable>
           </ThemedView>
           {id === "status" ? (
             <ThemedView style={styles.section}>
               {statusData.length === 0 ? (
-                <ThemedText style={styles.subtleText}>データがありません。</ThemedText>
+                <ThemedText style={[styles.subtleText, { color: textTertiary }]}>
+                  データがありません。
+                </ThemedText>
               ) : (
                 <>
                   <ThemedView style={styles.pieBar}>
@@ -218,7 +266,9 @@ export default function DashboardsScreen() {
           {id === "progress" ? (
             <ThemedView style={styles.section}>
               {projectData.length === 0 ? (
-                <ThemedText style={styles.subtleText}>プロジェクトがありません。</ThemedText>
+                <ThemedText style={[styles.subtleText, { color: textTertiary }]}>
+                  プロジェクトがありません。
+                </ThemedText>
               ) : (
                 projectData.map((project) => {
                   const percent =
@@ -233,11 +283,16 @@ export default function DashboardsScreen() {
                           {project.done} / {project.total}
                         </ThemedText>
                       </ThemedView>
-                      <ThemedView style={styles.progressTrack}>
+                      <ThemedView
+                        style={[
+                          styles.progressTrack,
+                          { backgroundColor: surfaceOverlay },
+                        ]}
+                      >
                         <ThemedView
                           style={[
                             styles.progressFill,
-                            { width: `${percent}%` },
+                            { backgroundColor: brandPrimary, width: `${percent}%` },
                           ]}
                         />
                       </ThemedView>
@@ -249,14 +304,21 @@ export default function DashboardsScreen() {
           ) : null}
           {id === "bugs" ? (
             <ThemedView style={styles.section}>
-              {issues.filter((issue) => issue.type === "Bug").slice(0, 4).map((bug) => (
-                <ThemedView key={bug.id} style={styles.rowBetween}>
-                  <ThemedText numberOfLines={1}>{bug.title}</ThemedText>
-                  <ThemedText style={styles.metaText}>{bug.key}</ThemedText>
-                </ThemedView>
-              ))}
+              {issues
+                .filter((issue) => issue.type === "Bug")
+                .slice(0, 4)
+                .map((bug) => (
+                  <ThemedView key={bug.id} style={styles.rowBetween}>
+                    <ThemedText numberOfLines={1}>{bug.title}</ThemedText>
+                    <ThemedText style={[styles.metaText, { color: textSecondary }]}>
+                      {bug.key}
+                    </ThemedText>
+                  </ThemedView>
+                ))}
               {issues.filter((issue) => issue.type === "Bug").length === 0 ? (
-                <ThemedText style={styles.subtleText}>最近のバグはありません。</ThemedText>
+                <ThemedText style={[styles.subtleText, { color: textTertiary }]}>
+                  最近のバグはありません。
+                </ThemedText>
               ) : null}
             </ThemedView>
           ) : null}
@@ -268,14 +330,21 @@ export default function DashboardsScreen() {
                 .map((issue) => (
                   <ThemedView key={issue.id} style={styles.rowBetween}>
                     <ThemedText numberOfLines={1}>{issue.title}</ThemedText>
-                    <ThemedText style={styles.warningBadge}>
+                    <ThemedText
+                      style={[
+                        styles.warningBadge,
+                        { backgroundColor: warningBg, color: warningText },
+                      ]}
+                    >
                       {new Date(issue.dueDate!).toLocaleDateString()}
                     </ThemedText>
                   </ThemedView>
                 ))}
               {issues.filter((issue) => issue.dueDate && issue.status !== "Done")
                 .length === 0 ? (
-                <ThemedText style={styles.subtleText}>期限情報はありません。</ThemedText>
+                <ThemedText style={[styles.subtleText, { color: textTertiary }]}>
+                  期限情報はありません。
+                </ThemedText>
               ) : null}
             </ThemedView>
           ) : null}
@@ -284,7 +353,9 @@ export default function DashboardsScreen() {
 
       {showAddModal ? (
         <ThemedView style={styles.modalOverlay}>
-          <ThemedView style={styles.modalCard}>
+          <ThemedView
+            style={[styles.modalCard, { backgroundColor: surfaceRaised }]}
+          >
             <ThemedView style={styles.rowBetween}>
               <ThemedText type="subtitle">ガジェットを追加</ThemedText>
               <Pressable onPress={() => setShowAddModal(false)}>
@@ -298,11 +369,17 @@ export default function DashboardsScreen() {
                   key={gadget.id}
                   onPress={() => addGadget(gadget.id)}
                   disabled={isActive}
-                  style={[styles.option, isActive && styles.optionDisabled]}
+                  style={[
+                    styles.option,
+                    { borderColor },
+                    isActive && styles.optionDisabled,
+                  ]}
                 >
                   <ThemedText type="defaultSemiBold">{gadget.title}</ThemedText>
                   {isActive ? (
-                    <ThemedText style={styles.subtleText}>追加済み</ThemedText>
+                    <ThemedText style={[styles.subtleText, { color: textSecondary }]}>
+                      追加済み
+                    </ThemedText>
                   ) : null}
                 </Pressable>
               );
@@ -329,7 +406,6 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   ghostButton: {
-    borderColor: "#e5e7eb",
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 10,
@@ -340,7 +416,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   metaText: {
-    color: "#6b7280",
     fontSize: 12,
   },
   modalCard: {
@@ -359,7 +434,6 @@ const styles = StyleSheet.create({
     top: 0,
   },
   option: {
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
     gap: 4,
@@ -369,7 +443,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   progressFill: {
-    backgroundColor: "#2563eb",
     borderRadius: 999,
     height: 6,
   },
@@ -377,7 +450,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   progressTrack: {
-    backgroundColor: "#e5e7eb",
     borderRadius: 999,
     height: 6,
   },
@@ -394,20 +466,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryButton: {
-    borderColor: "#2563eb",
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   subtleText: {
-    color: "#6b7280",
     fontSize: 12,
   },
   warningBadge: {
-    backgroundColor: "#ffedd5",
     borderRadius: 999,
-    color: "#c2410c",
     fontSize: 11,
     paddingHorizontal: 8,
     paddingVertical: 4,

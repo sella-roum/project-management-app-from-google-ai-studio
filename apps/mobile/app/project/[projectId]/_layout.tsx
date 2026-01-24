@@ -2,9 +2,10 @@ import { Slot, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 
-import { ProjectDataProvider } from "@/app/project/[projectId]/project-context";
+import { ProjectDataProvider } from "@/components/project/project-context";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 const PRIMARY_TABS = ["summary", "board", "backlog"] as const;
 const MORE_TABS = ["timeline", "releases", "automation", "settings"] as const;
@@ -17,6 +18,7 @@ export default function ProjectLayout() {
     [projectId],
   );
   const [showMore, setShowMore] = useState(false);
+  const borderColor = useThemeColor({}, "borderSubtle");
 
   if (!normalizedProjectId) {
     return null;
@@ -35,31 +37,37 @@ export default function ProjectLayout() {
             <Pressable
               key={tab}
               onPress={() => navigateTo(tab)}
-              style={styles.tab}
+              style={[styles.tab, { borderColor }]}
             >
               <ThemedText style={styles.tabLabel}>
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </ThemedText>
             </Pressable>
           ))}
-          <Pressable onPress={() => setShowMore(true)} style={styles.tab}>
+          <Pressable
+            onPress={() => setShowMore(true)}
+            style={[styles.tab, { borderColor }]}
+          >
             <ThemedText style={styles.tabLabel}>More</ThemedText>
           </Pressable>
         </ThemedView>
         {showMore ? (
-          <ThemedView style={styles.moreMenu}>
+          <ThemedView style={[styles.moreMenu, { borderBottomColor: borderColor }]}>
             {MORE_TABS.map((tab) => (
               <Pressable
                 key={tab}
                 onPress={() => navigateTo(tab)}
-                style={styles.moreItem}
+                style={[styles.moreItem, { borderColor }]}
               >
                 <ThemedText>
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </ThemedText>
               </Pressable>
             ))}
-            <Pressable onPress={() => setShowMore(false)} style={styles.moreItem}>
+            <Pressable
+              onPress={() => setShowMore(false)}
+              style={[styles.moreItem, { borderColor }]}
+            >
               <ThemedText>閉じる</ThemedText>
             </Pressable>
           </ThemedView>
@@ -75,21 +83,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   moreItem: {
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   moreMenu: {
-    borderBottomColor: "#e5e7eb",
     borderBottomWidth: 1,
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   tab: {
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,

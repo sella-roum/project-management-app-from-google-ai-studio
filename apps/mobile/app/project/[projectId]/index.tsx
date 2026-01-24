@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Alert,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  UIManager,
 } from "react-native";
 
 import {
@@ -46,7 +49,9 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { FloatingActionButton } from "@/components/floating-action-button";
 import { Input } from "@/components/ui/input";
-import { useProjectData } from "@/app/project/[projectId]/project-context";
+import { useProjectData } from "@/components/project/project-context";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { strings } from "@/constants/strings";
 
 const TABS = [
   "Summary",
@@ -79,6 +84,61 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
   const [boardSwimlane, setBoardSwimlane] = useState<
     "none" | "assignee"
   >("none");
+  const borderSubtle = useThemeColor({}, "borderSubtle");
+  const borderStrong = useThemeColor({}, "borderStrong");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
+  const surfaceBase = useThemeColor({}, "surfaceBase");
+  const surfaceRaised = useThemeColor({}, "surfaceRaised");
+  const surfaceOverlay = useThemeColor({}, "surfaceOverlay");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const textTertiary = useThemeColor({}, "textTertiary");
+  const textOnBrand = useThemeColor({}, "textOnBrand");
+  const stateErrorBg = useThemeColor({}, "stateErrorBg");
+  const stateErrorText = useThemeColor({}, "stateErrorText");
+  const cardStyle = [styles.card, { backgroundColor: surfaceRaised }];
+  const statCardStyle = [styles.statCard, { backgroundColor: surfaceRaised }];
+  const primaryButtonStyle = [styles.primaryBtn, { backgroundColor: brandPrimary }];
+  const secondaryButtonStyle = [
+    styles.secondaryBtn,
+    { backgroundColor: surfaceOverlay },
+  ];
+  const ghostButtonStyle = [styles.ghostBtn, { borderColor: borderStrong }];
+  const ghostButtonSmallStyle = [
+    styles.ghostBtnSmall,
+    { borderColor: borderStrong },
+  ];
+  const tabStyle = [styles.tab, { borderColor: borderSubtle }];
+  const tabActiveStyle = { borderColor: brandPrimary };
+  const boardToggleStyle = [styles.boardToggle, { borderColor: borderSubtle }];
+  const boardToggleActiveStyle = { borderColor: brandPrimary };
+  const filterChipStyle = [styles.filterChip, { borderColor: borderSubtle }];
+  const filterChipActiveStyle = { borderColor: brandPrimary };
+  const actionChipStyle = [styles.actionChip, { borderColor: borderSubtle }];
+  const optionStyle = [styles.option, { borderColor: borderSubtle }];
+  const optionActiveStyle = { borderColor: brandPrimary };
+  const chipStyle = [styles.chip, { backgroundColor: surfaceOverlay }];
+  const chipSelectedStyle = { backgroundColor: brandPrimary };
+  const metaBadgeStyle = [
+    styles.metaBadge,
+    { backgroundColor: surfaceOverlay, color: textSecondary },
+  ];
+  const progressTrackStyle = [
+    styles.progressTrack,
+    { backgroundColor: surfaceOverlay },
+  ];
+  const progressFillStyle = [
+    styles.progressFill,
+    { backgroundColor: brandPrimary },
+  ];
+  const timelineTrackStyle = [
+    styles.timelineTrack,
+    { backgroundColor: surfaceOverlay },
+  ];
+  const timelineBarStyle = [
+    styles.timelineBar,
+    { backgroundColor: brandPrimary },
+  ];
   const [boardFilters, setBoardFilters] = useState<("mine" | "recent")[]>([]);
   const [inlineCreateStatus, setInlineCreateStatus] = useState<IssueStatus | null>(
     null,
@@ -134,6 +194,16 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
   const [notificationDraft, setNotificationDraft] = useState<
     Record<string, string[]>
   >({});
+
+  useEffect(() => {
+    if (
+      Platform.OS === "android" &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
   const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>([]);
   const [automationTab, setAutomationTab] = useState<"rules" | "logs">("rules");
@@ -145,6 +215,12 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
     useState<AutomationRule["trigger"]>("issue_created");
   const [ruleAction, setRuleAction] =
     useState<AutomationRule["action"]>("assign_reporter");
+  const isAnyModalOpen =
+    showNotificationEditor || showAutomationForm || showWorkflowEditor || Boolean(completeSprint);
+
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [isAnyModalOpen]);
 
   const triggerLabelMap: Record<AutomationRule["trigger"], string> = {
     issue_created: "課題の作成時",
@@ -721,7 +797,10 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
         USERS.find((user) => user.id === issue.assigneeId)?.name || "未割り当て";
       const allowed = workflowSettings[issue.status] ?? [];
       return (
-        <ThemedView key={issue.id} style={styles.issueCard}>
+        <ThemedView
+          key={issue.id}
+          style={[styles.issueCard, { backgroundColor: surfaceBase }]}
+        >
           <Pressable
             onPress={() => handleOpenIssue(issue.id)}
             onLongPress={() => {
@@ -744,25 +823,34 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             <ThemedText>{issue.title}</ThemedText>
           </Pressable>
           <ThemedView style={styles.rowBetween}>
-            <ThemedText style={styles.metaText}>{assigneeName}</ThemedText>
+            <ThemedText style={[styles.metaText, { color: textSecondary }]}>
+              {assigneeName}
+            </ThemedText>
           </ThemedView>
         </ThemedView>
       );
     };
 
     return (
-      <ThemedView key={status} style={styles.card}>
-        <ThemedView style={styles.rowBetween}>
-          <ThemedText type="bodySemiBold">
-            {STATUS_LABELS[status]}
-          </ThemedText>
-          <ThemedText
-            style={[styles.metaText, isOverLimit && styles.overLimitText]}
-          >
-            {columnIssues.length}
-            {limit ? ` / ${limit}` : ""}
-          </ThemedText>
-        </ThemedView>
+        <ThemedView
+          key={status}
+          style={[styles.card, { backgroundColor: surfaceRaised }]}
+        >
+          <ThemedView style={styles.rowBetween}>
+            <ThemedText type="bodySemiBold">
+              {STATUS_LABELS[status]}
+            </ThemedText>
+            <ThemedText
+            style={[
+              styles.metaText,
+              { color: textSecondary },
+              isOverLimit && { color: stateErrorText },
+            ]}
+            >
+              {columnIssues.length}
+              {limit ? ` / ${limit}` : ""}
+            </ThemedText>
+          </ThemedView>
 
         {boardSwimlane === "assignee" ? (
           swimlanes.map((lane) => {
@@ -775,7 +863,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             if (laneIssues.length === 0) return null;
             return (
               <ThemedView key={`${status}-${lane.id}`} style={styles.section}>
-                <ThemedText style={styles.metaText}>
+                <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                   {lane.name} ({laneIssues.length})
                 </ThemedText>
                 {laneIssues.map(renderIssue)}
@@ -783,7 +871,9 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             );
           })
         ) : orderedIssues.length === 0 ? (
-          <ThemedText style={styles.metaText}>課題はありません。</ThemedText>
+          <ThemedText style={[styles.metaText, { color: textSecondary }]}>
+            課題はありません。
+          </ThemedText>
         ) : (
           orderedIssues.map(renderIssue)
         )}
@@ -799,16 +889,18 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
               <ThemedView style={styles.row}>
                 <Pressable
                   onPress={() => handleInlineCreate(status)}
-                  style={styles.primaryBtn}
+                  style={primaryButtonStyle}
                 >
-                  <ThemedText type="link">作成</ThemedText>
+                  <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                    作成
+                  </ThemedText>
                 </Pressable>
                 <Pressable
                   onPress={() => {
                     setInlineCreateStatus(null);
                     setInlineCreateTitle("");
                   }}
-                  style={styles.secondaryBtn}
+                  style={secondaryButtonStyle}
                 >
                   <ThemedText>キャンセル</ThemedText>
                 </Pressable>
@@ -817,7 +909,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
           ) : (
             <Pressable
               onPress={() => setInlineCreateStatus(status)}
-              style={styles.ghostBtn}
+              style={ghostButtonStyle}
             >
               <ThemedText>課題を追加</ThemedText>
             </Pressable>
@@ -832,10 +924,17 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
       <ScrollView contentContainerStyle={styles.container}>
         <ThemedText type="title">Project</ThemedText>
         {!ready ? (
-          <ThemedView style={styles.card}>
+          <ThemedView style={cardStyle}>
             <Skeleton height={20} width={180} />
             <Skeleton height={14} width={240} />
           </ThemedView>
+        ) : error ? (
+          <EmptyState
+            title="データの読み込みに失敗しました"
+            description="通信状況を確認して再度お試しください。"
+            actionLabel="再読み込み"
+            onAction={reload}
+          />
         ) : project ? (
           <>
             <ThemedText type="headline">{project.name}</ThemedText>
@@ -846,7 +945,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                 params: { mode: "issue", projectId: project.id },
               }}
             >
-              <ThemedText type="link">Create issue</ThemedText>
+              <ThemedText type="link">{strings.common.createIssue}</ThemedText>
             </Link>
             {showTabs ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -855,7 +954,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                     <Pressable
                       key={tab}
                       onPress={() => setActiveTab(tab)}
-                      style={[styles.tab, activeTab === tab && styles.tabActive]}
+                      style={[tabStyle, activeTab === tab && tabActiveStyle]}
                     >
                       <ThemedText>{tab}</ThemedText>
                     </Pressable>
@@ -867,26 +966,30 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
           {activeTab === "Summary" ? (
             <ThemedView style={styles.section}>
               <ThemedView style={styles.statsRow}>
-                <ThemedView style={styles.statCard}>
+                <ThemedView style={statCardStyle}>
                   <ThemedText type="bodySemiBold">
                     {issues.filter((i) => i.status !== "Done").length}
                   </ThemedText>
-                  <ThemedText style={styles.metaText}>未完了</ThemedText>
+                  <ThemedText style={[styles.metaText, { color: textSecondary }]}>
+                    未完了
+                  </ThemedText>
                 </ThemedView>
-                <ThemedView style={styles.statCard}>
+                <ThemedView style={statCardStyle}>
                   <ThemedText type="bodySemiBold">
                     {statusCounts["Done"] || 0}
                   </ThemedText>
-                  <ThemedText style={styles.metaText}>完了</ThemedText>
+                  <ThemedText style={[styles.metaText, { color: textSecondary }]}>
+                    完了
+                  </ThemedText>
                 </ThemedView>
               </ThemedView>
-              <ThemedView style={styles.card}>
+              <ThemedView style={cardStyle}>
                 <ThemedText type="headline">サマリー</ThemedText>
                 <ThemedText>{issues.length} issues</ThemedText>
                 <ThemedText>{versions.length} versions</ThemedText>
               </ThemedView>
               {stats && stats.workload.length > 0 ? (
-                <ThemedView style={styles.card}>
+                <ThemedView style={cardStyle}>
                   <ThemedText type="headline">ワークロード</ThemedText>
                   {stats.workload.map((item) => (
                     <ThemedView key={item.userName} style={styles.rowBetween}>
@@ -897,7 +1000,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                 </ThemedView>
               ) : null}
               {stats && stats.epicProgress.length > 0 ? (
-                <ThemedView style={styles.card}>
+                <ThemedView style={cardStyle}>
                   <ThemedText type="headline">エピック進捗</ThemedText>
                   {stats.epicProgress.map((epic) => (
                     <ThemedView key={epic.id} style={styles.rowBetween}>
@@ -907,7 +1010,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   ))}
                 </ThemedView>
               ) : null}
-              <ThemedView style={styles.card}>
+              <ThemedView style={cardStyle}>
                 <ThemedText type="headline">ステータス合計</ThemedText>
                 {(Object.keys(STATUS_LABELS) as IssueStatus[]).map((status) => (
                   <ThemedView key={status} style={styles.rowBetween}>
@@ -926,8 +1029,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   <Pressable
                     onPress={() => setBoardSwimlane("none")}
                     style={[
-                      styles.boardToggle,
-                      boardSwimlane === "none" && styles.boardToggleActive,
+                      boardToggleStyle,
+                      boardSwimlane === "none" && boardToggleActiveStyle,
                     ]}
                   >
                     <ThemedText>スタンダード</ThemedText>
@@ -935,8 +1038,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   <Pressable
                     onPress={() => setBoardSwimlane("assignee")}
                     style={[
-                      styles.boardToggle,
-                      boardSwimlane === "assignee" && styles.boardToggleActive,
+                      boardToggleStyle,
+                      boardSwimlane === "assignee" && boardToggleActiveStyle,
                     ]}
                   >
                     <ThemedText>担当者別</ThemedText>
@@ -946,8 +1049,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   <Pressable
                     onPress={() => toggleBoardFilter("mine")}
                     style={[
-                      styles.filterChip,
-                      boardFilters.includes("mine") && styles.filterChipActive,
+                      filterChipStyle,
+                      boardFilters.includes("mine") && filterChipActiveStyle,
                     ]}
                   >
                     <ThemedText>自分の課題</ThemedText>
@@ -955,8 +1058,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   <Pressable
                     onPress={() => toggleBoardFilter("recent")}
                     style={[
-                      styles.filterChip,
-                      boardFilters.includes("recent") && styles.filterChipActive,
+                      filterChipStyle,
+                      boardFilters.includes("recent") && filterChipActiveStyle,
                     ]}
                   >
                     <ThemedText>最近更新</ThemedText>
@@ -968,7 +1071,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   onPress={() =>
                     setBoardStatusIndex((prev) => Math.max(0, prev - 1))
                   }
-                  style={styles.secondaryBtn}
+                  style={secondaryButtonStyle}
                   disabled={boardStatusIndex === 0}
                 >
                   <ThemedText>前へ</ThemedText>
@@ -982,7 +1085,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       Math.min(BOARD_STATUSES.length - 1, prev + 1),
                     )
                   }
-                  style={styles.secondaryBtn}
+                  style={secondaryButtonStyle}
                   disabled={boardStatusIndex === BOARD_STATUSES.length - 1}
                 >
                   <ThemedText>次へ</ThemedText>
@@ -996,8 +1099,10 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             <ThemedView style={styles.section}>
               <ThemedView style={styles.rowBetween}>
                 <ThemedText type="headline">Backlog</ThemedText>
-                <Pressable onPress={handleCreateSprint} style={styles.primaryBtn}>
-                  <ThemedText type="link">スプリントを作成</ThemedText>
+                <Pressable onPress={handleCreateSprint} style={primaryButtonStyle}>
+                  <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                    スプリントを作成
+                  </ThemedText>
                 </Pressable>
               </ThemedView>
               {[...activeSprints, ...futureSprints, backlogSprint].map(
@@ -1029,7 +1134,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       ? undefined
                       : backlogSprint.id;
                   return (
-                    <ThemedView key={sprint.id} style={styles.card}>
+                    <ThemedView key={sprint.id} style={cardStyle}>
                       <ThemedView style={styles.rowBetween}>
                         <ThemedText type="bodySemiBold">
                           {sprint.name}
@@ -1038,7 +1143,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                           {!isBacklog && sprint.status === "future" ? (
                             <Pressable
                               onPress={() => handleStartSprint(sprint.id)}
-                              style={styles.secondaryBtn}
+                              style={secondaryButtonStyle}
                             >
                               <ThemedText>開始</ThemedText>
                             </Pressable>
@@ -1046,24 +1151,32 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                           {!isBacklog && sprint.status === "active" ? (
                             <Pressable
                               onPress={() => handleCompleteSprint(sprint)}
-                              style={styles.primaryBtn}
+                              style={primaryButtonStyle}
                             >
-                              <ThemedText type="link">完了</ThemedText>
+                              <ThemedText
+                                style={{ color: textOnBrand }}
+                                type="bodySemiBold"
+                              >
+                                完了
+                              </ThemedText>
                             </Pressable>
                           ) : null}
-                          <ThemedText style={styles.metaText}>
+                          <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                             {sprintIssues.length}
                           </ThemedText>
                         </ThemedView>
                       </ThemedView>
 
                       {orderedSprintIssues.length === 0 ? (
-                        <ThemedText style={styles.metaText}>
+                        <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                           課題はありません。
                         </ThemedText>
                       ) : (
                         orderedSprintIssues.map((issue) => (
-                          <ThemedView key={issue.id} style={styles.issueCard}>
+                          <ThemedView
+                            key={issue.id}
+                            style={[styles.issueCard, { backgroundColor: surfaceBase }]}
+                          >
                             <Pressable
                               onPress={() => handleOpenIssue(issue.id)}
                               style={styles.issueRow}
@@ -1074,7 +1187,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                               <ThemedText>{issue.title}</ThemedText>
                             </Pressable>
                             <ThemedView style={styles.rowBetween}>
-                              <ThemedText style={styles.metaText}>
+                              <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                                 {STATUS_LABELS[issue.status]}
                               </ThemedText>
                               <ThemedView style={styles.row}>
@@ -1086,7 +1199,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                                       "up",
                                     )
                                   }
-                                  style={styles.ghostBtnSmall}
+                                  style={ghostButtonSmallStyle}
                                 >
                                   <ThemedText>↑</ThemedText>
                                 </Pressable>
@@ -1098,7 +1211,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                                       "down",
                                     )
                                   }
-                                  style={styles.ghostBtnSmall}
+                                  style={ghostButtonSmallStyle}
                                 >
                                   <ThemedText>↓</ThemedText>
                                 </Pressable>
@@ -1110,7 +1223,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                                         : issue.id,
                                     )
                                   }
-                                  style={styles.ghostBtnSmall}
+                                  style={ghostButtonSmallStyle}
                                 >
                                   <ThemedText>移動</ThemedText>
                                 </Pressable>
@@ -1125,7 +1238,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                                       backlogTargetId,
                                     )
                                   }
-                                  style={styles.actionChip}
+                                  style={actionChipStyle}
                                 >
                                   <ThemedText>バックログ</ThemedText>
                                 </Pressable>
@@ -1139,7 +1252,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                                           target.id,
                                         )
                                       }
-                                      style={styles.actionChip}
+                                      style={actionChipStyle}
                                     >
                                       <ThemedText>{target.name}</ThemedText>
                                     </Pressable>
@@ -1165,16 +1278,18 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                                   isBacklog ? backlogTargetId : sprint.id,
                                 )
                               }
-                              style={styles.primaryBtn}
+                              style={primaryButtonStyle}
                             >
-                              <ThemedText type="link">作成</ThemedText>
+                              <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                                作成
+                              </ThemedText>
                             </Pressable>
                             <Pressable
                               onPress={() => {
                                 setInlineSprintId(null);
                                 setInlineSprintTitle("");
                               }}
-                              style={styles.secondaryBtn}
+                              style={secondaryButtonStyle}
                             >
                               <ThemedText>キャンセル</ThemedText>
                             </Pressable>
@@ -1183,7 +1298,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       ) : (
                         <Pressable
                           onPress={() => setInlineSprintId(sprint.id)}
-                          style={styles.ghostBtn}
+                          style={ghostButtonStyle}
                         >
                           <ThemedText>課題を追加</ThemedText>
                         </Pressable>
@@ -1203,8 +1318,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                     key={zoom}
                     onPress={() => setTimelineZoom(zoom)}
                     style={[
-                      styles.boardToggle,
-                      timelineZoom === zoom && styles.boardToggleActive,
+                      boardToggleStyle,
+                      timelineZoom === zoom && boardToggleActiveStyle,
                     ]}
                   >
                     <ThemedText>
@@ -1217,7 +1332,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   </Pressable>
                 ))}
               </ThemedView>
-              <ThemedText style={styles.metaText}>
+              <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                 {timelineConfig.start.toLocaleDateString()} -{" "}
                 {timelineConfig.end.toLocaleDateString()}
               </ThemedText>
@@ -1255,10 +1370,10 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                           {issue.title}
                         </ThemedText>
                       </Pressable>
-                      <ThemedView style={styles.timelineTrack}>
+                      <ThemedView style={timelineTrackStyle}>
                         <ThemedView
                           style={[
-                            styles.timelineBar,
+                            timelineBarStyle,
                             {
                               left: `${leftPercent}%`,
                               width: `${widthPercent}%`,
@@ -1292,8 +1407,10 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                 value={newVersionDate}
                 onChangeText={setNewVersionDate}
               />
-              <Pressable onPress={handleCreateVersion} style={styles.primaryBtn}>
-                <ThemedText type="link">Add version</ThemedText>
+              <Pressable onPress={handleCreateVersion} style={primaryButtonStyle}>
+                <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                  {strings.common.addVersion}
+                </ThemedText>
               </Pressable>
               {versions
                 .slice()
@@ -1316,35 +1433,32 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                         )
                       : 0;
                   return (
-                    <ThemedView key={version.id} style={styles.card}>
+                    <ThemedView key={version.id} style={cardStyle}>
                       <ThemedView style={styles.rowBetween}>
                         <ThemedText type="bodySemiBold">
                           {version.name}
                         </ThemedText>
-                        <ThemedText style={styles.metaText}>
+                        <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                           {version.status}
                         </ThemedText>
                       </ThemedView>
                       {version.releaseDate ? (
-                        <ThemedText style={styles.metaText}>
+                        <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                           {new Date(version.releaseDate).toLocaleDateString()}
                         </ThemedText>
                       ) : null}
                       <ThemedView style={styles.section}>
                         <ThemedView style={styles.rowBetween}>
-                          <ThemedText style={styles.metaText}>
+                          <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                             進捗 {progress}%
                           </ThemedText>
-                          <ThemedText style={styles.metaText}>
+                          <ThemedText style={[styles.metaText, { color: textSecondary }]}>
                             {doneIssues.length} / {versionIssues.length} 完了
                           </ThemedText>
                         </ThemedView>
-                        <ThemedView style={styles.progressTrack}>
+                        <ThemedView style={progressTrackStyle}>
                           <ThemedView
-                            style={[
-                              styles.progressFill,
-                              { width: `${progress}%` },
-                            ]}
+                            style={[progressFillStyle, { width: `${progress}%` }]}
                           />
                         </ThemedView>
                       </ThemedView>
@@ -1360,9 +1474,11 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                 <ThemedText type="headline">自動化</ThemedText>
                 <Pressable
                   onPress={handleStartCreateRule}
-                  style={styles.primaryBtn}
+                  style={primaryButtonStyle}
                 >
-                  <ThemedText type="link">ルールを追加</ThemedText>
+                  <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                    ルールを追加
+                  </ThemedText>
                 </Pressable>
               </ThemedView>
               <ThemedView style={styles.tabRow}>
@@ -1371,8 +1487,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                     key={tab}
                     onPress={() => setAutomationTab(tab)}
                     style={[
-                      styles.tab,
-                      automationTab === tab && styles.tabActive,
+                      tabStyle,
+                      automationTab === tab && tabActiveStyle,
                     ]}
                   >
                     <ThemedText>
@@ -1387,7 +1503,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                     <ThemedText>ルールはまだありません。</ThemedText>
                   ) : (
                     automationRules.map((rule) => (
-                      <ThemedView key={rule.id} style={styles.card}>
+                      <ThemedView key={rule.id} style={cardStyle}>
                         <ThemedText type="bodySemiBold">
                           {rule.name}
                         </ThemedText>
@@ -1407,7 +1523,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                         <ThemedView style={styles.row}>
                           <Pressable
                             onPress={() => handleStartEditRule(rule)}
-                            style={styles.secondaryBtn}
+                            style={secondaryButtonStyle}
                           >
                             <ThemedText>編集</ThemedText>
                           </Pressable>
@@ -1415,9 +1531,9 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                             onPress={() =>
                               handleToggleRule(rule.id, rule.enabled)
                             }
-                            style={styles.primaryBtn}
+                            style={primaryButtonStyle}
                           >
-                            <ThemedText type="link">
+                            <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
                               {rule.enabled ? "Disable" : "Enable"}
                             </ThemedText>
                           </Pressable>
@@ -1426,7 +1542,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                               setAutomationTab("logs");
                               setSelectedRuleId(rule.id);
                             }}
-                            style={styles.ghostBtn}
+                            style={ghostButtonStyle}
                           >
                             <ThemedText>ログを表示</ThemedText>
                           </Pressable>
@@ -1443,8 +1559,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       key={rule.id}
                       onPress={() => setSelectedRuleId(rule.id)}
                       style={[
-                        styles.option,
-                        selectedRuleId === rule.id && styles.optionActive,
+                        optionStyle,
+                        selectedRuleId === rule.id && optionActiveStyle,
                       ]}
                     >
                       <ThemedText>{rule.name}</ThemedText>
@@ -1455,7 +1571,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       <ThemedText>ログはまだありません。</ThemedText>
                     ) : (
                       automationLogs.map((log) => (
-                        <ThemedView key={log.id} style={styles.card}>
+                        <ThemedView key={log.id} style={cardStyle}>
                           <ThemedText type="bodySemiBold">
                             {log.status === "success"
                               ? "Success"
@@ -1492,8 +1608,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       key={tab.key}
                       onPress={() => setSettingsTab(tab.key)}
                       style={[
-                        styles.tab,
-                        settingsTab === tab.key && styles.tabActive,
+                        tabStyle,
+                        settingsTab === tab.key && tabActiveStyle,
                       ]}
                     >
                       <ThemedText>{tab.label}</ThemedText>
@@ -1526,14 +1642,15 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                               setProjectCategory(value as Project["category"])
                             }
                             style={[
-                              styles.chip,
-                              selected && styles.chipSelected,
+                              chipStyle,
+                              selected && chipSelectedStyle,
                             ]}
                           >
                             <ThemedText
                               style={[
                                 styles.chipText,
-                                selected && styles.chipTextSelected,
+                                { color: textPrimary },
+                                selected && { color: textOnBrand },
                               ]}
                             >
                               {label}
@@ -1551,16 +1668,25 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   <ThemedView style={styles.rowBetween}>
                     <Pressable
                       onPress={handleSaveDetails}
-                      style={styles.primaryBtn}
+                      style={primaryButtonStyle}
                     >
-                      <ThemedText type="link">Save settings</ThemedText>
+                      <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                        Save settings
+                      </ThemedText>
                     </Pressable>
                     {settingsSaved ? (
-                      <ThemedText style={styles.helperText}>保存済み</ThemedText>
+                      <ThemedText style={[styles.helperText, { color: textTertiary }]}>
+                        保存済み
+                      </ThemedText>
                     ) : null}
                   </ThemedView>
-                  <Pressable onPress={handleDeleteProject} style={styles.dangerBtn}>
-                    <ThemedText type="link">Delete project</ThemedText>
+                  <Pressable
+                    onPress={handleDeleteProject}
+                    style={[styles.dangerBtn, { backgroundColor: stateErrorBg }]}
+                  >
+                    <ThemedText style={{ color: stateErrorText }} type="bodySemiBold">
+                      Delete project
+                    </ThemedText>
                   </Pressable>
                 </ThemedView>
               ) : null}
@@ -1575,12 +1701,14 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       <ThemedView style={styles.rowWrap}>
                         {(workflowSettings[status] ?? []).length > 0 ? (
                           (workflowSettings[status] ?? []).map((next) => (
-                            <ThemedText key={next} style={styles.metaBadge}>
+                            <ThemedText key={next} style={metaBadgeStyle}>
                               {STATUS_LABELS[next] ?? next}
                             </ThemedText>
                           ))
                         ) : (
-                          <ThemedText style={styles.helperText}>遷移なし</ThemedText>
+                          <ThemedText style={[styles.helperText, { color: textTertiary }]}>
+                            遷移なし
+                          </ThemedText>
                         )}
                       </ThemedView>
                     </ThemedView>
@@ -1590,7 +1718,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       setWorkflowDraft(workflowSettings);
                       setShowWorkflowEditor(true);
                     }}
-                    style={styles.secondaryBtn}
+                    style={secondaryButtonStyle}
                   >
                     <ThemedText>ワークフローを編集</ThemedText>
                   </Pressable>
@@ -1607,7 +1735,9 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   ].map((item) => (
                     <ThemedView key={item.label} style={styles.rowBetween}>
                       <ThemedText>{item.label}</ThemedText>
-                      <ThemedText style={styles.helperText}>{item.roles}</ThemedText>
+                      <ThemedText style={[styles.helperText, { color: textTertiary }]}>
+                        {item.roles}
+                      </ThemedText>
                     </ThemedView>
                   ))}
                 </ThemedView>
@@ -1624,7 +1754,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       </ThemedText>
                       <ThemedView style={styles.rowWrap}>
                         {(notificationSettings[eventKey] ?? []).map((recipient) => (
-                          <ThemedText key={recipient} style={styles.metaBadge}>
+                          <ThemedText key={recipient} style={metaBadgeStyle}>
                             {recipient}
                           </ThemedText>
                         ))}
@@ -1636,7 +1766,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                       setNotificationDraft(notificationSettings);
                       setShowNotificationEditor(true);
                     }}
-                    style={styles.secondaryBtn}
+                    style={secondaryButtonStyle}
                   >
                     <ThemedText>通知スキームを編集</ThemedText>
                   </Pressable>
@@ -1654,7 +1784,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
 
       {completeSprint ? (
         <ThemedView style={styles.overlay}>
-          <ThemedView style={styles.modalCard}>
+          <ThemedView style={[styles.modalCard, { backgroundColor: surfaceRaised }]}>
             <ThemedText type="headline">
               スプリント完了: {completeSprint.name}
             </ThemedText>
@@ -1664,8 +1794,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             <Pressable
               onPress={() => setCompleteDestination("backlog")}
               style={[
-                styles.option,
-                completeDestination === "backlog" && styles.optionActive,
+                optionStyle,
+                completeDestination === "backlog" && optionActiveStyle,
               ]}
             >
               <ThemedText>バックログ</ThemedText>
@@ -1673,8 +1803,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             <Pressable
               onPress={() => setCompleteDestination("next")}
               style={[
-                styles.option,
-                completeDestination === "next" && styles.optionActive,
+                optionStyle,
+                completeDestination === "next" && optionActiveStyle,
               ]}
             >
               <ThemedText>次のスプリントへ</ThemedText>
@@ -1682,15 +1812,17 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             <ThemedView style={styles.rowBetween}>
               <Pressable
                 onPress={() => setCompleteSprint(null)}
-                style={styles.secondaryBtn}
+                style={secondaryButtonStyle}
               >
                 <ThemedText>キャンセル</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleApplyCompleteSprint}
-                style={styles.primaryBtn}
+                style={primaryButtonStyle}
               >
-                <ThemedText type="link">完了</ThemedText>
+                <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                  完了
+                </ThemedText>
               </Pressable>
             </ThemedView>
           </ThemedView>
@@ -1699,7 +1831,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
 
       {showAutomationForm ? (
         <ThemedView style={styles.overlay}>
-          <ThemedView style={styles.modalCard}>
+          <ThemedView style={[styles.modalCard, { backgroundColor: surfaceRaised }]}>
             <ThemedText type="headline">
               {editingRule ? "自動化ルールの編集" : "自動化ルールの作成"}
             </ThemedText>
@@ -1718,8 +1850,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                 key={item.value}
                 onPress={() => setRuleTrigger(item.value)}
                 style={[
-                  styles.option,
-                  ruleTrigger === item.value && styles.optionActive,
+                  optionStyle,
+                  ruleTrigger === item.value && optionActiveStyle,
                 ]}
               >
                 <ThemedText>{item.label}</ThemedText>
@@ -1738,8 +1870,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                 key={item.value}
                 onPress={() => setRuleAction(item.value)}
                 style={[
-                  styles.option,
-                  ruleAction === item.value && styles.optionActive,
+                  optionStyle,
+                  ruleAction === item.value && optionActiveStyle,
                 ]}
               >
                 <ThemedText>{item.label}</ThemedText>
@@ -1751,15 +1883,17 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                   setShowAutomationForm(false);
                   resetAutomationForm();
                 }}
-                style={styles.secondaryBtn}
+                style={secondaryButtonStyle}
               >
                 <ThemedText>キャンセル</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleSaveAutomationRule}
-                style={styles.primaryBtn}
+                style={primaryButtonStyle}
               >
-                <ThemedText type="link">保存</ThemedText>
+                <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                  保存
+                </ThemedText>
               </Pressable>
             </ThemedView>
           </ThemedView>
@@ -1767,7 +1901,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
       ) : null}
       {showWorkflowEditor ? (
         <ThemedView style={styles.overlay}>
-          <ThemedView style={styles.modalCard}>
+          <ThemedView style={[styles.modalCard, { backgroundColor: surfaceRaised }]}>
             <ThemedText type="headline">ワークフローを編集</ThemedText>
             <ScrollView style={styles.modalScroll}>
               {workflowStatusOptions.map((status) => (
@@ -1786,8 +1920,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                             toggleWorkflowTransition(status, nextStatus)
                           }
                           style={[
-                            styles.option,
-                            selected && styles.optionActive,
+                            optionStyle,
+                            selected && optionActiveStyle,
                           ]}
                         >
                           <ThemedText>{STATUS_LABELS[nextStatus]}</ThemedText>
@@ -1801,12 +1935,14 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             <ThemedView style={styles.rowBetween}>
               <Pressable
                 onPress={() => setShowWorkflowEditor(false)}
-                style={styles.secondaryBtn}
+                style={secondaryButtonStyle}
               >
                 <ThemedText>キャンセル</ThemedText>
               </Pressable>
-              <Pressable onPress={handleSaveWorkflow} style={styles.primaryBtn}>
-                <ThemedText type="link">保存</ThemedText>
+              <Pressable onPress={handleSaveWorkflow} style={primaryButtonStyle}>
+                <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                  保存
+                </ThemedText>
               </Pressable>
             </ThemedView>
           </ThemedView>
@@ -1815,7 +1951,7 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
 
       {showNotificationEditor ? (
         <ThemedView style={styles.overlay}>
-          <ThemedView style={styles.modalCard}>
+          <ThemedView style={[styles.modalCard, { backgroundColor: surfaceRaised }]}>
             <ThemedText type="headline">通知スキーム</ThemedText>
             <ScrollView style={styles.modalScroll}>
               {Object.keys(DEFAULT_NOTIFICATION_SCHEME).map((eventKey) => (
@@ -1837,8 +1973,8 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
                             toggleNotificationRecipient(eventKey, recipient)
                           }
                           style={[
-                            styles.option,
-                            selected && styles.optionActive,
+                            optionStyle,
+                            selected && optionActiveStyle,
                           ]}
                         >
                           <ThemedText>{recipient}</ThemedText>
@@ -1852,15 +1988,17 @@ export function ProjectView({ initialTab, showTabs = false }: ProjectViewProps) 
             <ThemedView style={styles.rowBetween}>
               <Pressable
                 onPress={() => setShowNotificationEditor(false)}
-                style={styles.secondaryBtn}
+                style={secondaryButtonStyle}
               >
                 <ThemedText>キャンセル</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleSaveNotifications}
-                style={styles.primaryBtn}
+                style={primaryButtonStyle}
               >
-                <ThemedText type="link">保存</ThemedText>
+                <ThemedText style={{ color: textOnBrand }} type="bodySemiBold">
+                  保存
+                </ThemedText>
               </Pressable>
             </ThemedView>
           </ThemedView>
@@ -1897,7 +2035,6 @@ export default function ProjectIndexRedirect() {
 
 const styles = StyleSheet.create({
   actionChip: {
-    borderColor: "#e5e7eb",
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 10,
@@ -1907,14 +2044,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   boardToggle: {
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
-  },
-  boardToggleActive: {
-    borderColor: "#2563eb",
   },
   card: {
     borderRadius: 12,
@@ -1927,49 +2060,34 @@ const styles = StyleSheet.create({
   },
   dangerBtn: {
     alignItems: "center",
-    backgroundColor: "#dc2626",
     borderRadius: 12,
     paddingVertical: 12,
   },
   chip: {
-    backgroundColor: "#f3f4f6",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  chipSelected: {
-    backgroundColor: "#2563eb",
-  },
   chipText: {
-    color: "#111827",
     fontSize: 12,
-  },
-  chipTextSelected: {
-    color: "#ffffff",
   },
   fieldGroup: {
     gap: 6,
   },
   filterChip: {
-    borderColor: "#e5e7eb",
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  filterChipActive: {
-    borderColor: "#2563eb",
-  },
   ghostBtnSmall: {
     alignItems: "center",
-    borderColor: "#d1d5db",
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   helperText: {
-    color: "#6b7280",
     fontSize: 12,
   },
   inlineRow: {
@@ -1989,7 +2107,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   modalCard: {
-    backgroundColor: "#ffffff",
     borderRadius: 16,
     gap: 12,
     padding: 20,
@@ -1999,28 +2116,19 @@ const styles = StyleSheet.create({
     maxHeight: 320,
   },
   metaBadge: {
-    backgroundColor: "#f3f4f6",
     borderRadius: 999,
     fontSize: 11,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   metaText: {
-    color: "#6b7280",
     fontSize: 12,
   },
-  overLimitText: {
-    color: "#dc2626",
-  },
   option: {
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
-  },
-  optionActive: {
-    borderColor: "#2563eb",
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -2030,18 +2138,15 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     alignItems: "center",
-    backgroundColor: "#2563eb",
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
   progressFill: {
-    backgroundColor: "#2563eb",
     borderRadius: 999,
     height: 6,
   },
   progressTrack: {
-    backgroundColor: "#e5e7eb",
     borderRadius: 999,
     height: 6,
   },
@@ -2065,7 +2170,6 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     alignItems: "center",
-    backgroundColor: "#e5e7eb",
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -2075,21 +2179,16 @@ const styles = StyleSheet.create({
   },
   ghostBtn: {
     alignItems: "center",
-    borderColor: "#d1d5db",
     borderRadius: 12,
     borderWidth: 1,
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
   tab: {
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
-  },
-  tabActive: {
-    borderColor: "#2563eb",
   },
   tabRow: {
     flexDirection: "row",
@@ -2107,7 +2206,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   timelineBar: {
-    backgroundColor: "#2563eb",
     borderRadius: 999,
     height: 8,
     position: "absolute",
@@ -2119,7 +2217,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   timelineTrack: {
-    backgroundColor: "#e5e7eb",
     borderRadius: 999,
     height: 20,
     position: "relative",

@@ -41,6 +41,7 @@ export const Colors = {
     stateInfoBg: "#dbeafe",
     stateInfoText: "#1d4ed8",
   },
+  // NOTE: 現在はライトテーマ固定。ダークは将来の復帰用に保持。
   dark: {
     background: "#151718",
     surfaceBase: "#0f172a",

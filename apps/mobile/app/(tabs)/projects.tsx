@@ -130,7 +130,7 @@ export default function ProjectsScreen() {
   };
 
   const handleOpenProject = (projectId: string) => {
-    router.push(`/projects/${projectId}`);
+    router.push(`/project/${projectId}`);
   };
 
   const formatDueDate = (date?: string) =>

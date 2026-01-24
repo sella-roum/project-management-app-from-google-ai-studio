@@ -2,6 +2,7 @@ import { Pressable, StyleSheet } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 type EmptyStateProps = {
   title: string;
@@ -16,14 +17,27 @@ export function EmptyState({
   actionLabel,
   onAction,
 }: EmptyStateProps) {
+  const brandPrimary = useThemeColor({}, "brandPrimary");
+  const textOnBrand = useThemeColor({}, "textOnBrand");
+  const textTertiary = useThemeColor({}, "textTertiary");
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText style={styles.icon}>✨</ThemedText>
       <ThemedText type="subtitle">{title}</ThemedText>
-      {description ? <ThemedText style={styles.text}>{description}</ThemedText> : null}
+      {description ? (
+        <ThemedText style={[styles.text, { color: textTertiary }]}>
+          {description}
+        </ThemedText>
+      ) : null}
       {actionLabel && onAction ? (
-        <Pressable onPress={onAction} style={styles.button}>
-          <ThemedText style={styles.buttonText}>{actionLabel}</ThemedText>
+        <Pressable
+          onPress={onAction}
+          style={[styles.button, { backgroundColor: brandPrimary }]}
+        >
+          <ThemedText style={[styles.buttonText, { color: textOnBrand }]}>
+            {actionLabel}
+          </ThemedText>
         </Pressable>
       ) : null}
     </ThemedView>
@@ -33,14 +47,12 @@ export function EmptyState({
 const styles = StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: "#2563eb",
     borderRadius: 12,
     minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   buttonText: {
-    color: "#ffffff",
   },
   container: {
     alignItems: "center",
@@ -51,7 +63,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   text: {
-    color: "#6b7280",
     textAlign: "center",
   },
 });

@@ -59,11 +59,9 @@ export default function RootLayout() {
           animationDuration: 250,
         }}
       >
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="issue/[issueId]" options={{ title: "Issue" }} />
         <Stack.Screen name="project/[projectId]" options={{ title: "Project" }} />
-        <Stack.Screen name="projects/[projectId]" options={{ title: "Project" }} />
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: "modal" }} />
       </Stack>
